@@ -10,30 +10,20 @@ st.set_page_config(page_title="Weather Data Analysis", layout="wide")
 st.title("Weather Data Analysis")
 st.markdown("---")
 
-# Load and prepare data
-@st.cache_data
-def load_data():
-    """Load and prepare the weather data"""
-    try:
-        df = pd.read_csv("assets/open-meteo-subset.csv")
-        # Convert time column to datetime
-        df['time'] = pd.to_datetime(df['time'])
-        # Extract month for filtering
-        df['month'] = df['time'].dt.strftime('%Y-%m')
-        return df
-    except FileNotFoundError:
-        st.error("❌ Could not find the data file. Please ensure 'assets/open-meteo-subset.csv' exists.")
-        return None
-    except Exception as e:
-        st.error(f"❌ Error loading data: {str(e)}")
-        return None
+# Get data from session state (loaded in homepage)
+df = st.session_state.get('weather_data', None)
 
-# Load data
-df = load_data()
+if df is None:
+    st.error("No weather data available. Please visit the homepage first to load the data.")
+    st.stop()
 
 if df is not None:
+    # Work on a local copy to avoid mutating cached data in session state
+    df_local = df.copy()
+    # Extract month for filtering
+    df_local['month'] = df_local['time'].dt.strftime('%Y-%m')
     # Get unique months for the slider
-    months = sorted(df['month'].unique())
+    months = sorted(df_local['month'].unique())
     
     # Create month abbreviations mapping
     month_mapping = {}
@@ -52,8 +42,8 @@ if df is not None:
     
     with col1:
         st.subheader("Column Selection")
-        # Get numeric columns (excluding time and month)
-        numeric_columns = [col for col in df.columns if col not in ['time', 'month']]
+        # Get numeric columns (excluding time)
+        numeric_columns = [col for col in df_local.select_dtypes(include='number').columns if col not in ['time']]
         column_options = ['All Columns'] + numeric_columns
         
         selected_column = st.selectbox(
@@ -66,11 +56,17 @@ if df is not None:
     with col2:
         st.subheader("Month Selection")
         # Month selection slider with abbreviated names
+        # Default to the first month only (January) — two handles set to the first month if range is available
+        default_month_value = (
+            (month_display_names[0], month_display_names[0])
+            if len(month_display_names) >= 2
+            else month_display_names[0]
+        )
         selected_month_display = st.select_slider(
             "Select month range:",
             options=month_display_names,
-            value=month_display_names[0],  # Default to first month
-            help="Use the slider to select a range of months to display"
+            value=default_month_value,
+            help="Use the slider to select a contiguous range of months"
         )
     
     # Convert display selection back to actual month values for filtering
@@ -88,7 +84,7 @@ if df is not None:
         selected_months = [month_mapping[selected_month_display]]
     
     # Filter data based on selected months
-    filtered_df = df[df['month'].isin(selected_months)]
+    filtered_df = df_local[df_local['month'].isin(selected_months)]
     
     st.markdown("---")
     
@@ -198,24 +194,6 @@ if df is not None:
         # Display the plot
         st.plotly_chart(fig, width='stretch')
         
-        # Display summary statistics
-        st.markdown("---")
-        st.subheader("Summary Statistics")
-        
-        if selected_column == 'All Columns':
-            stats_df = filtered_df[numeric_columns].describe()
-        else:
-            stats_df = filtered_df[selected_column].describe().to_frame().T
-        
-        st.dataframe(stats_df, width='stretch')
-        
-        # Show raw data preview
-        with st.expander("View Raw Data Preview"):
-            st.dataframe(filtered_df.head(100), width='stretch')
-            
-            if len(filtered_df) > 100:
-                st.info(f"Showing first 100 rows out of {len(filtered_df)} total rows")
-    
     else:
         st.warning("No data available for the selected month(s).")
         
