@@ -38,4 +38,5 @@ The dataset used is a subset of weather data from [Open-Meteo](https://open-mete
 - Home Page: Overview of the project and data load status.
 - Second Page: Table with weather parameters for January 2020, incl. mean, min, max, std.
 - Third Page: Dynamic visualization with parameter selection and month range filter.
+- Fourth Page: Placeholder for future content.
 """)
