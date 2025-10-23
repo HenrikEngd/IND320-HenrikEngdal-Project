@@ -192,7 +192,7 @@ if df is not None:
             )
         
         # Display the plot
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
     else:
         st.warning("No data available for the selected month(s).")
