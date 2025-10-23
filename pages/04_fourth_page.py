@@ -13,7 +13,10 @@ st.title("Energy Production Analysis")
 @st.cache_resource
 def get_mongo_client():
     """Create and return MongoDB client"""
-    uri = "mongodb+srv://henrikengd_db_user:VfyggMT5CT8vw7lH@cluster0.xxdbouc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    db_user = st.secrets["database"]["db_user"]
+    secret = st.secrets["database"]["secret"]
+
+    uri = f"mongodb+srv://{db_user}:{secret}@cluster0.xxdbouc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     client = MongoClient(uri, server_api=ServerApi('1'))
     
     # Test connection
@@ -91,7 +94,7 @@ month_names = ['January', 'February', 'March', 'April', 'May', 'June',
 # Create two columns
 col1, col2 = st.columns(2)
 
-# LEFT COLUMN - Pie Chart
+# Pie Chart
 with col1:
     st.subheader("Total Production by Type")
     
@@ -122,8 +125,8 @@ with col1:
     fig1 = go.Figure(data=[go.Pie(
         labels=legend_labels,  # Use custom labels with percentages
         values=production_summary['total_production'],
-        hole=0,  # Set to 0 for pie chart, or 0.3-0.4 for donut chart
-        textinfo='none',  # Don't show any text on the pie chart itself
+        hole=0, 
+        textinfo='none',  # Using legend, so no need for text on pie
         hovertemplate='<b>%{label}</b><br>Production: %{value:,.0f} kWh<extra></extra>',
         marker=dict(
             colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
@@ -149,7 +152,7 @@ with col1:
             font=dict(size=10)
         ),
         height=450,
-        margin=dict(l=20, r=180, t=60, b=20)  # Increased right margin for longer legend text
+        margin=dict(l=20, r=180, t=60, b=20)
     )
     
     # Display the pie chart
@@ -193,7 +196,7 @@ with col2:
         # Create Plotly line chart
         fig2 = go.Figure()
         
-        # Define colors for different production groups
+        # Define colors for usage
         colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
                   '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
         
