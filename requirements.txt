@@ -3,4 +3,8 @@ pandas
 plotly
 matplotlib
 pymongo
+requests
+scipy
+statsmodels
+scikit-learn
 
