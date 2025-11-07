@@ -4,10 +4,68 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+import certifi
+import requests
 
 st.set_page_config(page_title="Energy Production Analysis", layout="wide")
 
 st.title("Energy Production Analysis")
+# Load and cache data globally
+@st.cache_data
+def load_weather_data(price_area):
+    """Load weather data from Open-Meteo API based on price area"""
+    try:
+        # Define coordinates for each Norwegian price area
+        area_coordinates = {
+            'NO1': {'latitude': 59.91, 'longitude': 10.75, 'name': 'Oslo'},  # Oslo
+            'NO2': {'latitude': 60.39, 'longitude': 5.32, 'name': 'Bergen'},  # Bergen
+            'NO3': {'latitude': 63.43, 'longitude': 10.39, 'name': 'Trondheim'},  # Trondheim
+            'NO4': {'latitude': 69.65, 'longitude': 18.96, 'name': 'Tromsø'},  # Tromsø
+            'NO5': {'latitude': 60.47, 'longitude': 8.47, 'name': 'Gol'}  # Gol (approximate)
+        }
+        
+        if price_area not in area_coordinates:
+            st.error(f"Unknown price area: {price_area}")
+            return None
+        
+        coords = area_coordinates[price_area]
+        
+        # Build Open-Meteo API URL for 2021
+        url = (
+            f"https://archive-api.open-meteo.com/v1/archive?"
+            f"latitude={coords['latitude']}&longitude={coords['longitude']}"
+            f"&start_date=2021-01-01&end_date=2021-12-31"
+            f"&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
+            f"&timezone=Europe/Oslo"
+        )
+        
+        # Fetch data from API
+        response = requests.get(url)
+        
+        if response.status_code != 200:
+            st.error(f"API request failed with status code: {response.status_code}")
+            return None
+        
+        data = response.json()
+        
+        # Convert to DataFrame
+        df = pd.DataFrame({
+            'time': pd.to_datetime(data['hourly']['time']),
+            'temperature_2m': data['hourly']['temperature_2m'],
+            'relative_humidity_2m': data['hourly']['relative_humidity_2m'],
+            'precipitation': data['hourly']['precipitation'],
+            'wind_speed_10m': data['hourly']['wind_speed_10m']
+        })
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"Error loading weather data: {str(e)}")
+        return None
+
+# Initialize session state for selected area if not exists
+if 'selected_area' not in st.session_state:
+    st.session_state.selected_area = None
 
 # MongoDB connection
 @st.cache_resource
@@ -17,7 +75,13 @@ def get_mongo_client():
     secret = st.secrets["database"]["secret"]
 
     uri = f"mongodb+srv://{db_user}:{secret}@cluster0.xxdbouc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-    client = MongoClient(uri, server_api=ServerApi('1'))
+    # Use certifi CA bundle to avoid SSL CERTIFICATE_VERIFY_FAILED on macOS
+    client = MongoClient(
+        uri,
+        server_api=ServerApi('1'),
+        tls=True,
+        tlsCAFile=certifi.where(),
+    )
     
     # Test connection
     try:
