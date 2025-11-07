@@ -10,31 +10,38 @@ import requests
 st.set_page_config(page_title="Energy Production Analysis", layout="wide")
 
 st.title("Energy Production Analysis")
+
+# Read session-cached values (set by other pages) with safe defaults
+weather_df_session = st.session_state.get('weather_data')
+selected_area_session = st.session_state.get('selected_area', 'NO5')
+selected_city_session = st.session_state.get('selected_city', 'Bergen')
+weather_year_session = st.session_state.get('weather_year', '2021')
+
+# Coordinates/names for Norwegian price areas (shared across pages)
+AREA_COORDINATES = {
+    'NO1': {'latitude': 59.91, 'longitude': 10.75, 'name': 'Oslo'},
+    'NO2': {'latitude': 60.39, 'longitude': 5.32,  'name': 'Bergen'},
+    'NO3': {'latitude': 63.43, 'longitude': 10.39, 'name': 'Trondheim'},
+    'NO4': {'latitude': 69.65, 'longitude': 18.96, 'name': 'Tromsø'},
+    'NO5': {'latitude': 60.47, 'longitude': 8.47,  'name': 'Gol'}
+}
 # Load and cache data globally
 @st.cache_data
-def load_weather_data(price_area):
-    """Load weather data from Open-Meteo API based on price area"""
+def load_weather_data(price_area: str, year: str = '2021'):
+    """Load weather data from Open-Meteo API based on price area and year"""
     try:
-        # Define coordinates for each Norwegian price area
-        area_coordinates = {
-            'NO1': {'latitude': 59.91, 'longitude': 10.75, 'name': 'Oslo'},  # Oslo
-            'NO2': {'latitude': 60.39, 'longitude': 5.32, 'name': 'Bergen'},  # Bergen
-            'NO3': {'latitude': 63.43, 'longitude': 10.39, 'name': 'Trondheim'},  # Trondheim
-            'NO4': {'latitude': 69.65, 'longitude': 18.96, 'name': 'Tromsø'},  # Tromsø
-            'NO5': {'latitude': 60.47, 'longitude': 8.47, 'name': 'Gol'}  # Gol (approximate)
-        }
-        
-        if price_area not in area_coordinates:
+        if price_area not in AREA_COORDINATES:
             st.error(f"Unknown price area: {price_area}")
             return None
-        
-        coords = area_coordinates[price_area]
-        
-        # Build Open-Meteo API URL for 2021
+
+        coords = AREA_COORDINATES[price_area]
+
+        # Build Open-Meteo API URL for selected year
+        year_str = str(year)
         url = (
             f"https://archive-api.open-meteo.com/v1/archive?"
             f"latitude={coords['latitude']}&longitude={coords['longitude']}"
-            f"&start_date=2021-01-01&end_date=2021-12-31"
+            f"&start_date={year_str}-01-01&end_date={year_str}-12-31"
             f"&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
             f"&timezone=Europe/Oslo"
         )
@@ -63,9 +70,7 @@ def load_weather_data(price_area):
         st.error(f"Error loading weather data: {str(e)}")
         return None
 
-# Initialize session state for selected area if not exists
-if 'selected_area' not in st.session_state:
-    st.session_state.selected_area = None
+# No need to initialize selected_area here; we respect cross-page session values
 
 # MongoDB connection
 @st.cache_resource
@@ -161,36 +166,45 @@ col1, col2 = st.columns(2)
 # Pie Chart
 with col1:
     st.subheader("Total Production by Type")
-    
-    # Radio buttons for price area selection
+
+    # Radio with default from session
+    selected_area_default = selected_area_session if selected_area_session in price_areas else price_areas[0]
     selected_area = st.radio(
         "Select Price Area:",
         options=price_areas,
-        horizontal=True
+        horizontal=True,
+        index=price_areas.index(selected_area_default)
     )
-    
-    # Calculate total production by group for selected area
+
+    # Update session state selections
+    st.session_state['selected_area'] = selected_area
+    st.session_state['selected_city'] = AREA_COORDINATES.get(selected_area, {}).get('name', selected_city_session)
+    st.session_state['weather_year'] = weather_year_session  # keep existing year
+
+    # Refresh weather data if missing or area/year changed
+    if (
+        ('weather_data' not in st.session_state)
+        or (st.session_state.get('weather_area') != selected_area)
+        or (str(st.session_state.get('weather_year')) != str(weather_year_session))
+    ):
+        wdf = load_weather_data(selected_area, weather_year_session)
+        if wdf is not None:
+            st.session_state['weather_data'] = wdf
+            st.session_state['weather_area'] = selected_area
+            st.session_state['weather_year'] = weather_year_session
+
     area_data = df[df['priceArea'] == selected_area]
     production_summary = area_data.groupby('productionGroup')['quantityKwh'].sum().reset_index()
     production_summary.columns = ['productionGroup', 'total_production']
-    production_summary = production_summary.sort_values('total_production', ascending=False)
-    
-    # Calculate percentages
     total = production_summary['total_production'].sum()
-    production_summary['percentage'] = (production_summary['total_production'] / total * 100)
-    
-    # Create custom labels with percentages for legend
-    legend_labels = [
-        f"{row['productionGroup']} ({row['percentage']:.1f}%)" 
-        for _, row in production_summary.iterrows()
-    ]
-    
-    # Create Plotly pie chart with no text on the pie itself
+    production_summary['percentage'] = (production_summary['total_production'] / total * 100).round(1)
+    legend_labels = [f"{row.productionGroup} ({row.percentage:.1f}%)" for row in production_summary.itertuples()]
+
     fig1 = go.Figure(data=[go.Pie(
-        labels=legend_labels,  # Use custom labels with percentages
+        labels=legend_labels,
         values=production_summary['total_production'],
-        hole=0, 
-        textinfo='none',  # Using legend, so no need for text on pie
+        hole=0,
+        textinfo='none',
         hovertemplate='<b>%{label}</b><br>Production: %{value:,.0f} kWh<extra></extra>',
         marker=dict(
             colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
@@ -198,13 +212,13 @@ with col1:
             line=dict(color='white', width=2)
         )
     )])
-    
+
     fig1.update_layout(
         title={
             'text': f"Total Production Distribution in {selected_area}",
             'x': 0.5,
             'xanchor': 'center',
-            'font': {'size': 16, 'weight': 'bold'}
+            'font': {'size': 16}
         },
         showlegend=True,
         legend=dict(
@@ -218,12 +232,9 @@ with col1:
         height=450,
         margin=dict(l=20, r=180, t=60, b=20)
     )
-    
-    # Display the pie chart
+
     st.plotly_chart(fig1, use_container_width=True)
-    
-    # Display summary statistics
-    st.metric("Total Production (kWh)", f"{production_summary['total_production'].sum():,.0f}")
+    st.metric("Total Production (kWh)", f"{total:,.0f}")
 
 # Line Plot
 with col2:
