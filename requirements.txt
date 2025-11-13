@@ -4,4 +4,9 @@ plotly
 matplotlib
 pymongo
 certifi
+statsmodels
+scipy
+scikit-learn
+requests-cache
+retry-requests
 
