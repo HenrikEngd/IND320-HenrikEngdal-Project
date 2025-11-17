@@ -142,17 +142,7 @@ The application demonstrates data loading, processing, and visualization using S
 - **Apache Spark**: Distributed data processing and aggregations
 - **MongoDB Atlas**: Cloud database for energy production data
 - **Cassandra**: Distributed NoSQL database integration
-
-### Content
-- **Home Page**: Overview of the project and data load status
-- **Second Page**: Statistical analysis table with weather parameters for January 2020 (mean, min, max, std)
-- **Third Page**: Dynamic weather data visualization with parameter selection and month range filter using Plotly charts
-- **Fourth Page**: Energy Production Analysis
-  - Interactive Plotly pie chart showing production distribution by type (hydro, wind, thermal, etc.)
-  - Time-series line chart with multi-group selection
-  - Data filtered by Norwegian price areas (NO1-NO5)
-  - Real-time data from MongoDB Atlas
-  - Powered by Apache Spark aggregations
+          
 
 ### Data Pipeline
 ```
