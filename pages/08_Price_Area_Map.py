@@ -66,8 +66,6 @@ if "last_pin" not in st.session_state:
     st.session_state.last_pin = [66.32624933088354, 14.186465980232347]
 if "selected_feature_id" not in st.session_state:
     st.session_state.selected_feature_id = None
-if "selected_coordinates" not in st.session_state:
-    st.session_state.selected_coordinates = tuple(st.session_state.last_pin)
 
 # Preselect area for the initial pin (no click required)
 if st.session_state.selected_feature_id is None:
@@ -79,18 +77,7 @@ map_col, info_col = st.columns([2.2, 1])
 
 with map_col:
     # Build map (one per run)
-    m = folium.Map(
-        location=st.session_state.last_pin,
-        zoom_start=5,
-        tiles="OpenStreetMap",
-        width=700,
-        height=500,
-        zoom_control=False,
-        scrollWheelZoom=False,
-        doubleClickZoom=False,
-        dragging=False,
-        touchZoom=False,
-    )
+    m = folium.Map(location=st.session_state.last_pin, zoom_start=5, tiles="OpenStreetMap")
 
     # Choropleth (single layer)
     folium.Choropleth(
@@ -127,8 +114,8 @@ with map_col:
         popup=f"{st.session_state.last_pin[0]:.5f}, {st.session_state.last_pin[1]:.5f}"
     ).add_to(m)
 
-    # Render with fixed size
-    out = st_folium(m, key="choropleth_map", height=500, width=700)
+    # Render (width inherits from column)
+    out = st_folium(m, key="choropleth_map", height=600, width=None)
 
     # Process click: update pin and polygon ID, then single rerun
     if out and out.get("last_clicked"):
@@ -138,15 +125,12 @@ with map_col:
         if new_coord != st.session_state.last_pin:
             st.session_state.last_pin = new_coord
             st.session_state.selected_feature_id = find_feature_id(lon, lat)
-            st.session_state.selected_coordinates = (lat, lon)
             st.rerun()
 
 with info_col:
     st.subheader("Selection")
     st.write(f"Lat: {st.session_state.last_pin[0]:.6f}")
     st.write(f"Lon: {st.session_state.last_pin[1]:.6f}")
-
-    st.session_state.selected_coordinates = tuple(st.session_state.last_pin)
 
     if st.session_state.selected_feature_id is None:
         st.write("Outside known features.")

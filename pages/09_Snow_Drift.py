@@ -8,6 +8,7 @@ import plotly.express as px
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, avg
 
+
 st.title("Snow Drift Analysis")
 
 # Year range selection
@@ -53,4 +54,3 @@ else:
     fig = px.line(snow_drift_pd, x="year", y="avg_snow_drift", title="Average Snow Drift per Year")
     st.plotly_chart(fig)
 
-    
