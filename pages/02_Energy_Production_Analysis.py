@@ -102,7 +102,7 @@ def load_data():
     """Load and process data from MongoDB"""
     client = get_mongo_client()
     
-    database = client['ca2_database'] 
+    database = client['DB_Production_ELBHUB_Data'] 
     collection = database['data']
     
     # Fetch all documents from MongoDB

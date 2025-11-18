@@ -27,7 +27,7 @@ def get_mongo_client():
 @st.cache_data
 def load_production_data():
 	client = get_mongo_client()
-	database = client['ca2_database']
+	database = client['DB_Production_ELBHUB_Data']
 	collection = database['data']
 	records = list(collection.find({}, {'_id': 0}))
 	if not records:
