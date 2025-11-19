@@ -15,30 +15,12 @@ st.title("NEW A: STL Decomposition and Spectrogram")
 # Get area context from Page 2 if available
 default_area = st.session_state.get('selected_area', 'NO5')
 
-# MongoDB client (certifi-based TLS to avoid SSL issues)
-@st.cache_resource
-def get_mongo_client():
-	db_user = st.secrets["database"]["db_user"]
-	secret = st.secrets["database"]["secret"]
-	uri = f"mongodb+srv://{db_user}:{secret}@cluster0.xxdbouc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-	client = MongoClient(uri, server_api=ServerApi('1'), tls=True, tlsCAFile=certifi.where())
-	return client
+df = st.session_state.get('ELHUB_Production_data', None)
+if df is None:
+    st.error("No production data available. Please visit the homepage first to load the data.")
+    st.stop()
 
-@st.cache_data
-def load_production_data():
-	client = get_mongo_client()
-	database = client['DB_Production_ELBHUB_Data']
-	collection = database['data']
-	records = list(collection.find({}, {'_id': 0}))
-	if not records:
-		st.error("No production data found in MongoDB. Ensure CA2 ingestion ran.")
-		st.stop()
-	df = pd.DataFrame(records)
-	df['startTime'] = pd.to_datetime(df['startTime'], errors='coerce')
-	df = df.dropna(subset=['startTime']).reset_index(drop=True)
-	return df
-
-df = load_production_data()
+df = df[df['startTime'].dt.year == 2021].reset_index(drop=True)
 price_areas = sorted(df['priceArea'].dropna().unique())
 production_groups = sorted(df['productionGroup'].dropna().unique())
 
