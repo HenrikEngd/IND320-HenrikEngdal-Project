@@ -70,88 +70,14 @@ def load_weather_data(price_area: str, year: str = '2021'):
         st.error(f"Error loading weather data: {str(e)}")
         return None
 
-# No need to initialize selected_area here; we respect cross-page session values
 
-# MongoDB connection
-@st.cache_resource
-def get_mongo_client():
-    """Create and return MongoDB client"""
-    db_user = st.secrets["database"]["db_user"]
-    secret = st.secrets["database"]["secret"]
+# Load data and filter to only 2021
+df = st.session_state.get('ELHUB_Production_data', None)
+if df is None:
+    st.error("No production data available. Please visit the homepage first to load the data.")
+    st.stop()
 
-    uri = f"mongodb+srv://{db_user}:{secret}@cluster0.xxdbouc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-    # Use certifi CA bundle to avoid SSL CERTIFICATE_VERIFY_FAILED on macOS
-    client = MongoClient(
-        uri,
-        server_api=ServerApi('1'),
-        tls=True,
-        tlsCAFile=certifi.where(),
-    )
-    
-    # Test connection
-    try:
-        client.admin.command('ping')
-    except Exception as e:
-        st.error(f"MongoDB connection failed: {e}")
-    
-    return client
-
-# Load and process data
-@st.cache_data
-def load_data():
-    """Load and process data from MongoDB"""
-    client = get_mongo_client()
-    
-    database = client['ca2_database'] 
-    collection = database['data']
-    
-    # Fetch all documents from MongoDB
-    records = list(collection.find({}, {'_id': 0}))
-    
-    if not records:
-        st.error("No data found in MongoDB! Please run your notebook to insert data first.")
-        st.stop()
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(records)
-    
-    # Clean the data - remove any records with list or invalid values
-    def is_valid_record(row):
-        """Check if a record has valid data types"""
-        for col in ['startTime', 'endTime', 'lastUpdatedTime', 'priceArea', 'productionGroup', 'quantityKwh']:
-            if col in row and isinstance(row[col], list):
-                return False
-        return True
-    
-    # Filter out invalid records
-    valid_indices = df.apply(is_valid_record, axis=1)
-    initial_count = len(df)
-    df = df[valid_indices].reset_index(drop=True)
-    
-    if len(df) < initial_count:
-        st.warning(f"Filtered out {initial_count - len(df)} invalid records from the dataset.")
-    
-    # Convert date columns to datetime (with error handling)
-    try:
-        df['startTime'] = pd.to_datetime(df['startTime'], errors='coerce')
-        df['endTime'] = pd.to_datetime(df['endTime'], errors='coerce')
-        df['lastUpdatedTime'] = pd.to_datetime(df['lastUpdatedTime'], errors='coerce')
-        
-        # Remove rows where datetime conversion failed
-        df = df.dropna(subset=['startTime']).reset_index(drop=True)
-        
-        # Add month columns
-        df['month'] = df['startTime'].dt.month
-        df['month_name'] = df['startTime'].dt.strftime('%B')
-        
-    except Exception as e:
-        st.error(f"Error processing datetime columns: {e}")
-        st.stop()
-    
-    return df
-
-# Load data
-df = load_data()
+df = df[df['startTime'].dt.year == 2021].reset_index(drop=True)
 
 # Get unique values for filters
 price_areas = sorted(df['priceArea'].unique())

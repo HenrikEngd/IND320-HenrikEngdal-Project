@@ -9,14 +9,14 @@ st.markdown("---")
 
 # Get data from session state (loaded in homepage)
 df = st.session_state.get('weather_data', None)
-
 if df is None:
     st.error("No weather data available. Please visit the homepage first to load the data.")
     st.stop()
 
 if df is not None:
-    # Filter data for the first month
-    first_month_df = df[df['time'].dt.strftime('%Y-%m') == '2020-01']
+    # Filter data for the first available month
+    first_month = df['time'].dt.to_period('M').min()
+    first_month_df = df[df['time'].dt.to_period('M') == first_month]
     
     # Get numeric columns only (exclude non-numeric like 'time' or any string columns)
     numeric_columns = list(df.select_dtypes(include='number').columns)

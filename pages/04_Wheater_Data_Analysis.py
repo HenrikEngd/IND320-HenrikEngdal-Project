@@ -14,7 +14,7 @@ st.markdown("---")
 df = st.session_state.get('weather_data', None)
 
 if df is None:
-    st.error("No weather data available. Please visit the homepage first to load the data.")
+    st.error("No weather data available. Please visit Energy Production Analysis to load.")
     st.stop()
 
 if df is not None:
