@@ -4,9 +4,10 @@ import numpy as np
 import plotly.graph_objects as go
 from sklearn.neighbors import LocalOutlierFactor
 from scipy.fftpack import dct, idct
-
-
-def temp_spc_satv(times, temps, dct_cutoff=200, n_std=3.5):
+def temp_spc_satv(times, temps, dct_cutoff=200, n_std=3.5, robust=True, scale_mad=True):
+    # Defensive: check for empty input
+    if len(temps) == 0:
+        raise ValueError("Temperature array is empty.")
     t = np.asarray(times)
     x = np.asarray(temps, dtype=float)
     n = len(x)
@@ -20,30 +21,54 @@ def temp_spc_satv(times, temps, dct_cutoff=200, n_std=3.5):
         nans = np.isnan(x)
         not_nans = ~nans
         x[nans] = np.interp(np.where(nans)[0], np.where(not_nans)[0], x[not_nans])
-    # DCT high-pass filtering for SATV
-    temp_dct = dct(x, type=2, norm="ortho")
-    temp_dct[:dct_cutoff] = 0
-    satv = idct(temp_dct, type=2, norm="ortho")
-    # Robust statistics for SPC boundaries
-    median_satv = np.median(satv)
-    mad_satv = np.median(np.abs(satv - median_satv)) * 1.4826
-    lower_bound = median_satv - n_std * mad_satv
-    upper_bound = median_satv + n_std * mad_satv
-    is_outlier = (satv < lower_bound) | (satv > upper_bound)
+
+    # DCT low-pass for trend
+    X = dct(x, norm="ortho")
+    X_lp = np.zeros_like(X)
+    X_lp[:dct_cutoff] = X[:dct_cutoff]
+    trend = idct(X_lp, norm="ortho")
+
+    # SATV (high-pass)
+    satv = x - trend
+
+    # Robust or classical limits in SATV space
+    if robust:
+        center = np.median(satv)
+        mad = np.median(np.abs(satv - center))
+        spread = (1.4826 * mad) if scale_mad else mad
+    else:
+        center = np.mean(satv)
+        spread = np.std(satv)
+
+    upper_satv = center + n_std * spread
+    lower_satv = center - n_std * spread
+
+    # Map limits to temperature space
+    upper_curve = trend + upper_satv
+    lower_curve = trend + lower_satv
+
+    # Outliers in SATV space
+    is_outlier = (satv > upper_satv) | (satv < lower_satv)
+
+    # Plot
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=t[~is_outlier], y=x[~is_outlier], mode="lines", name="Inliers", line=dict(width=1)))
     fig.add_trace(go.Scatter(x=t[is_outlier], y=x[is_outlier], mode="markers", name="Outliers", marker=dict(size=6, opacity=0.9)))
-    fig.add_trace(go.Scatter(x=t, y=[upper_bound]*n, mode="lines", name="Upper SPC limit", line=dict(color="blue", dash="dash")))
-    fig.add_trace(go.Scatter(x=t, y=[lower_bound]*n, mode="lines", name="Lower SPC limit", line=dict(color="blue", dash="dash")))
-    fig.update_layout(template="plotly_white", title=dict(text="Temperature with SPC boundaries (DCT)", x=0.5, xanchor="center", font=dict(size=30)), xaxis_title="Date", yaxis_title="Temperature (°C)")
+    fig.add_trace(go.Scatter(x=t, y=upper_curve, mode="lines", name="Upper SPC limit", line=dict(color="blue", dash="dash")))
+    fig.add_trace(go.Scatter(x=t, y=lower_curve, mode="lines", name="Lower SPC limit", line=dict(color="blue", dash="dash")))
+    fig.update_layout(template="plotly_white", title=dict(text="Temperature with SPC boundaries (SATV)", x=0.5, xanchor="center", font=dict(size=30)), xaxis_title="Date", yaxis_title="Temperature (°C)")
     summary = {
         "n_outliers": int(is_outlier.sum()),
         "n_total": int(n),
         "percent_outliers": round(100 * is_outlier.mean(), 2),
-        "spc_lower": float(lower_bound),
-        "spc_upper": float(upper_bound),
+        "satv_center": float(center),
+        "satv_spread": float(spread),
+        "upper_satv_limit": float(upper_satv),
+        "lower_satv_limit": float(lower_satv),
         "dct_cutoff": dct_cutoff,
-        "n_std": n_std
+        "n_std": n_std,
+        "robust": robust,
+        "scale_mad": scale_mad
     }
     return fig, is_outlier, summary
 
@@ -100,9 +125,12 @@ with tab_spc:
         w1 = df.dropna(subset=[temp_col]).copy()
         times = w1['time']
         temps = w1[temp_col].astype(float).values
-        fig, is_outlier, summary = temp_spc_satv(times, temps, dct_cutoff=dct_cutoff, n_std=n_std)
-        st.plotly_chart(fig, use_container_width=True)
-        st.info(f"Outliers: {summary['n_outliers']} of {summary['n_total']} ({summary['percent_outliers']:.2f}%)")
+        try:
+            fig, is_outlier, summary = temp_spc_satv(times, temps, dct_cutoff=dct_cutoff, n_std=n_std)
+            st.plotly_chart(fig, use_container_width=True)
+            st.info(f"Outliers: {summary['n_outliers']} of {summary['n_total']} ({summary['percent_outliers']:.2f}%)")
+        except Exception as e:
+            st.warning(f"SPC calculation failed: {e}")
         # Only show summary, not table
 
 with tab_lof:
