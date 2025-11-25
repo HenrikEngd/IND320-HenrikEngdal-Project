@@ -62,14 +62,14 @@ value_map = {6: 5.0, 7: 3.5, 8: 4.2, 9: 6.1, 10: 2.8}
 df_vals = pd.DataFrame({"id": list(value_map.keys()), "value": list(value_map.values())})
 
 # Session state init
-if "last_pin" not in st.session_state:
-    st.session_state.last_pin = [66.32624933088354, 14.186465980232347]
+if "selected_coordinates" not in st.session_state:
+    st.session_state.selected_coordinates = [66.32624933088354, 14.186465980232347]
 if "selected_feature_id" not in st.session_state:
     st.session_state.selected_feature_id = None
 
 # Preselect area for the initial pin (no click required)
 if st.session_state.selected_feature_id is None:
-    lat, lon = st.session_state.last_pin
+    lat, lon = st.session_state.selected_coordinates
     st.session_state.selected_feature_id = find_feature_id(lon, lat)
 
 # Layout: map left, info right
@@ -77,7 +77,7 @@ map_col, info_col = st.columns([2.2, 1])
 
 with map_col:
     # Build map (one per run)
-    m = folium.Map(location=st.session_state.last_pin, zoom_start=5, tiles="OpenStreetMap")
+    m = folium.Map(location=st.session_state.selected_coordinates, zoom_start=5, tiles="OpenStreetMap")
 
     # Choropleth (single layer)
     folium.Choropleth(
@@ -109,9 +109,9 @@ with map_col:
 
     # Single pin (last clicked)
     folium.Marker(
-        location=st.session_state.last_pin,
+        location=st.session_state.selected_coordinates,
         icon=folium.Icon(color="red"),
-        popup=f"{st.session_state.last_pin[0]:.5f}, {st.session_state.last_pin[1]:.5f}"
+        popup=f"{st.session_state.selected_coordinates[0]:.5f}, {st.session_state.selected_coordinates[1]:.5f}"
     ).add_to(m)
 
     # Render (width inherits from column)
@@ -122,15 +122,15 @@ with map_col:
         lat = out["last_clicked"]["lat"]
         lon = out["last_clicked"]["lng"]
         new_coord = [lat, lon]
-        if new_coord != st.session_state.last_pin:
-            st.session_state.last_pin = new_coord
+        if new_coord != st.session_state.selected_coordinates:
+            st.session_state.selected_coordinates = new_coord
             st.session_state.selected_feature_id = find_feature_id(lon, lat)
             st.rerun()
 
 with info_col:
     st.subheader("Selection")
-    st.write(f"Lat: {st.session_state.last_pin[0]:.6f}")
-    st.write(f"Lon: {st.session_state.last_pin[1]:.6f}")
+    st.write(f"Lat: {st.session_state.selected_coordinates[0]:.6f}")
+    st.write(f"Lon: {st.session_state.selected_coordinates[1]:.6f}")
 
     if st.session_state.selected_feature_id is None:
         st.write("Outside known features.")

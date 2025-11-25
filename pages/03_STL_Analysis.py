@@ -99,9 +99,9 @@ def stl_decomposition_plot(
 
 	return fig_obs, fig_seasonal, fig_trend, fig_resid
 
-st.set_page_config(page_title="NEW A: STL & Spectrogram", layout="wide")
+st.set_page_config(page_title="STL & Spectrogram", layout="wide")
 
-st.title("NEW A: STL Decomposition and Spectrogram")
+st.title("STL Decomposition and Spectrogram")
 
 # Get area context from Page 2 if available
 default_area = st.session_state.get('selected_area', 'NO5')

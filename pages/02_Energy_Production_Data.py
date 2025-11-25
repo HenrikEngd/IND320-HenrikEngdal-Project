@@ -7,9 +7,7 @@ from pymongo.server_api import ServerApi
 import certifi
 import requests
 
-st.set_page_config(page_title="Energy Production Analysis", layout="wide")
-
-st.title("Energy Production Analysis")
+st.set_page_config(page_title="Energy Production Data", layout="wide")
 
 # Read session-cached values (set by other pages) with safe defaults
 weather_df_session = st.session_state.get('weather_data')

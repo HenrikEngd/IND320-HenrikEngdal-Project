@@ -91,9 +91,9 @@ def precip_lof(times, precip, contamination=0.01, n_neighbors=20):
     }
     return fig, is_outlier, summary
 
-st.set_page_config(page_title="NEW B: Outliers & Anomalies", layout="wide")
+st.set_page_config(page_title="Outliers & Anomalies", layout="wide")
 
-st.title("NEW B: Temperature SPC and Precipitation LOF")
+st.title("Temperature SPC and Precipitation LOF")
 
 # Expect weather data from Page 2
 df = st.session_state.get('weather_data')

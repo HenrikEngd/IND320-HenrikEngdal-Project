@@ -5,6 +5,11 @@ import pandas as pd
 from pymongo.server_api import ServerApi
 import certifi
 
+st.set_page_config(
+    page_title="IND320 - Data to Decision | Project Homepage",
+    layout="centered"
+)
+
 # MongoDB connection
 @st.cache_resource
 def get_mongo_client():
@@ -124,8 +129,6 @@ def load_ELHUB_Consumption_data():
 st.session_state['ELHUB_Production_data'] = load_ELHUB_Production_data()
 st.session_state['ELHUB_Consumption_data'] = load_ELHUB_Consumption_data()
 
-st.title("IND320 Course Project")
-
 
 st.markdown("""
 ### Project Overview
@@ -134,19 +137,19 @@ The application demonstrates data loading, processing, and visualization using S
 
 **Data Sources:**
 - Weather data from [Open-Meteo](https://open-meteo.com/)
-- Norwegian energy production data from [Elhub API](https://api.elhub.no/)
+- Norwegian energy production / consumption data from [Elhub API](https://api.elhub.no/)
+- Geodata from [NVE](https://temakart.nve.no/tema/nettanlegg)
 
 **Technologies:**
 - **Streamlit**: Interactive web application framework
 - **Plotly**: Advanced interactive visualizations
-- **Apache Spark**: Distributed data processing and aggregations
-- **MongoDB Atlas**: Cloud database for energy production data
+- **Spark**: Distributed data processing and aggregations
+- **MongoDB**: Cloud database for energy production / consumption data
 - **Cassandra**: Distributed NoSQL database integration
           
-
 ### Data Pipeline
 ```
 API → JSON → Pandas → Spark (aggregations) → MongoDB → Streamlit
 ```
-The energy production data is processed using Apache Spark for distributed aggregations, stored in MongoDB Atlas, and visualized with interactive Plotly charts.
+The energy production / consumption data is processed using Spark for distributed aggregations, stored in MongoDB Atlas, and visualized with interactive Plotly charts.
 """)
