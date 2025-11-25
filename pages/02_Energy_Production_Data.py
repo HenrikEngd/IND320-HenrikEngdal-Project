@@ -1,10 +1,6 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
-import certifi
 import requests
 
 st.set_page_config(page_title="Energy Production Data", layout="wide")
@@ -22,7 +18,7 @@ AREA_COORDINATES = {
     'NO3': {'latitude': 63.43, 'longitude': 10.39, 'name': 'Trondheim'},
     'NO4': {'latitude': 69.65, 'longitude': 18.96, 'name': 'Tromsø'},
     'NO5': {'latitude': 60.47, 'longitude': 8.47,  'name': 'Gol'}
-}
+} 
 # Load and cache data globally
 @st.cache_data
 def load_weather_data(price_area: str, year: str = '2021'):
