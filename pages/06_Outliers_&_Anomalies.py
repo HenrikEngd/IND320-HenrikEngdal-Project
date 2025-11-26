@@ -99,9 +99,14 @@ st.title("Temperature SPC and Precipitation LOF")
 # Render global price area selector (will persist selection across pages)
 prod_df = st.session_state.get('ELHUB_Production_data')
 prod_groups = None
-if prod_df is not None and 'productionGroup' in prod_df.columns:
-    prod_groups = sorted(prod_df['productionGroup'].dropna().unique())
-_ = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
+if prod_df is not None and 'productiongroup' in prod_df.columns:
+    prod_groups = sorted(prod_df['productiongroup'].dropna().unique())
+selected_area = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
+
+# Force rerun if the selected area changes
+if 'weather_area' in st.session_state and st.session_state['weather_area'] != selected_area:
+    st.session_state['selected_area'] = selected_area
+    st.experimental_rerun()
 
 # Expect weather data from Page 2
 df = st.session_state.get('weather_data')

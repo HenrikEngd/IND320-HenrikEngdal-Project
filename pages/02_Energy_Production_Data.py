@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import requests
+from utils.fetch import load_weather_data
 from utils.sidebar import price_area_sidebar
+from utils.fetch import AREA_COORDINATES
 
 st.set_page_config(page_title="Energy Production Data", layout="wide")
 
@@ -12,68 +14,8 @@ selected_area_session = st.session_state.get('selected_area', 'NO5')
 selected_city_session = st.session_state.get('selected_city', 'Bergen')
 weather_year_session = st.session_state.get('weather_year', '2021')
 
-# Coordinates/names for Norwegian price areas (shared across pages)
-AREA_COORDINATES = {
-    'NO1': {'latitude': 59.91, 'longitude': 10.75, 'name': 'Oslo'},
-    'NO2': {'latitude': 60.39, 'longitude': 5.32,  'name': 'Bergen'},
-    'NO3': {'latitude': 63.43, 'longitude': 10.39, 'name': 'Trondheim'},
-    'NO4': {'latitude': 69.65, 'longitude': 18.96, 'name': 'Tromsø'},
-    'NO5': {'latitude': 60.47, 'longitude': 8.47,  'name': 'Gol'}
-} 
-# Load and cache data globally
-@st.cache_data
-def load_weather_data(price_area: str = None, lat: float = None, lon: float = None, start: str = '2021', end: str = '2024'):
-    """Load weather data from Open-Meteo API based on price area or lat/lon and year"""
-    try:
-        coords = None
-        if lat is not None and lon is not None:
-            coords = {'latitude': lat, 'longitude': lon}
-        elif price_area is not None:
-            if price_area not in AREA_COORDINATES:
-                st.error(f"Unknown price area: {price_area}")
-                return None
-            coords = AREA_COORDINATES[price_area]
 
-        if coords is None:
-            st.error("No coordinates supplied to load weather data")
-            return None
-
-        # Build Open-Meteo API URL for selected year
-        start_date = f"{start}-01-01"
-        end_date = f"{end}-12-31"
-        url = (
-            f"https://archive-api.open-meteo.com/v1/archive?"
-            f"latitude={coords['latitude']}&longitude={coords['longitude']}"
-            f"&start_date={start_date}&end_date={end_date}"
-            f"&hourly=temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
-            f"&timezone=Europe/Oslo"
-        )
-
-        # Fetch data from API
-        response = requests.get(url)
-
-        if response.status_code != 200:
-            st.error(f"API request failed with status code: {response.status_code}")
-            return None
-
-        data = response.json()
-
-        # Convert to DataFrame
-        df = pd.DataFrame({
-            'time': pd.to_datetime(data['hourly']['time']),
-            'temperature_2m': data['hourly']['temperature_2m'],
-            'precipitation': data['hourly']['precipitation'],
-            'wind_speed_10m': data['hourly']['wind_speed_10m'],
-            'wind_direction_10m': data['hourly']['wind_direction_10m'],
-            'wind_gusts_10m': data['hourly']['wind_gusts_10m']
-        })
-
-        return df
-
-    except Exception as e:
-        st.error(f"Error loading weather data: {str(e)}")
-        return None
-
+st.session_state['weather_data'] = load_weather_data(selected_area_session, start="2021-01-01", end="2024-12-31")
 
 # Load data and filter to only 2021
 df = st.session_state.get('ELHUB_Production_data', None)
@@ -81,11 +23,15 @@ if df is None:
     st.error("No production data available. Please visit the homepage first to load the data.")
     st.stop()
 
-df = df[df['startTime'].dt.year == 2021].reset_index(drop=True)
+df = df[df['starttime'].dt.year == 2021].reset_index(drop=True)
+
+# Add this to ensure 'month' exists
+if 'month' not in df.columns:
+    df['month'] = df['starttime'].dt.month
 
 # Get unique values for filters
-price_areas = sorted(df['priceArea'].unique())
-production_groups = sorted(df['productionGroup'].unique())
+price_areas = sorted(df['pricearea'].unique())
+production_groups = sorted(df['productiongroup'].unique())
 months = sorted(df['month'].unique())
 month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
                'July', 'August', 'September', 'October', 'November', 'December']
@@ -112,21 +58,21 @@ with col1:
         or (st.session_state.get('weather_area') != selected_area)
         or (str(st.session_state.get('weather_year')) != str(weather_year_session))
     ):
-        if sel_coords:
-            wdf = load_weather_data(lat=sel_coords[0], lon=sel_coords[1], start=weather_year_session, end=weather_year_session)
-        else:
-            wdf = load_weather_data(selected_area, start=weather_year_session, end=weather_year_session)
+        # Ensure weather_year_session is a string year (e.g., '2021')
+        start_date = f"{weather_year_session}-01-01"
+        end_date = f"{weather_year_session}-12-31"
+        wdf = load_weather_data(selected_area, start=start_date, end=end_date)
         if wdf is not None:
             st.session_state['weather_data'] = wdf
             st.session_state['weather_area'] = selected_area
             st.session_state['weather_year'] = weather_year_session
 
-    area_data = df[df['priceArea'] == selected_area]
-    production_summary = area_data.groupby('productionGroup')['quantityKwh'].sum().reset_index()
-    production_summary.columns = ['productionGroup', 'total_production']
+    area_data = df[df['pricearea'] == selected_area]
+    production_summary = area_data.groupby('productiongroup')['quantitykwh'].sum().reset_index()
+    production_summary.columns = ['productiongroup', 'total_production']
     total = production_summary['total_production'].sum()
     production_summary['percentage'] = (production_summary['total_production'] / total * 100).round(1)
-    legend_labels = [f"{row.productionGroup} ({row.percentage:.1f}%)" for row in production_summary.itertuples()]
+    legend_labels = [f"{row.productiongroup} ({row.percentage:.1f}%)" for row in production_summary.itertuples()]
 
     fig1 = go.Figure(data=[go.Pie(
         labels=legend_labels,
@@ -187,8 +133,8 @@ with col2:
     
     # Filter data based on selections
     filtered_df = df[
-        (df['priceArea'] == selected_area) & 
-        (df['productionGroup'].isin(selected_groups)) &
+        (df['pricearea'] == selected_area) & 
+        (df['productiongroup'].isin(selected_groups)) &
         (df['month'] == selected_month)
     ]
     
@@ -202,12 +148,12 @@ with col2:
         
         # Add a line for each production group
         for i, group in enumerate(selected_groups):
-            group_data = filtered_df[filtered_df['productionGroup'] == group].sort_values('startTime')
-            
+            group_data = filtered_df[filtered_df['productiongroup'] == group].sort_values('starttime')
+
             if not group_data.empty:
                 fig2.add_trace(go.Scatter(
-                    x=group_data['startTime'],
-                    y=group_data['quantityKwh'],
+                    x=group_data['starttime'],
+                    y=group_data['quantitykwh'],
                     mode='lines+markers',
                     name=group,
                     line=dict(color=colors[i % len(colors)], width=2),
@@ -259,9 +205,9 @@ with col2:
         # Display metrics
         col_metric1, col_metric2 = st.columns(2)
         with col_metric1:
-            st.metric("Average Production", f"{filtered_df['quantityKwh'].mean():,.0f} kWh")
+            st.metric("Average Production", f"{filtered_df['quantitykwh'].mean():,.0f} kWh")
         with col_metric2:
-            st.metric("Peak Production", f"{filtered_df['quantityKwh'].max():,.0f} kWh")
+            st.metric("Peak Production", f"{filtered_df['quantitykwh'].max():,.0f} kWh")
     else:
         st.warning("No data available for the selected filters.")
 

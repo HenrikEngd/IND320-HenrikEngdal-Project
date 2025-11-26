@@ -12,58 +12,49 @@ st.set_page_config(page_title="Weather Data Analysis", layout="wide")
 st.title("Weather Data Analysis")
 st.markdown("---")
 
+
 # Ensure the global price-area selector is shown and session coords are kept in sync
 # If production groups are available in session data, expose them in the sidebar
 prod_df = st.session_state.get('ELHUB_Production_data')
 prod_groups = None
-if prod_df is not None and 'productionGroup' in prod_df.columns:
-    prod_groups = sorted(prod_df['productionGroup'].dropna().unique())
-_ = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
+if prod_df is not None and 'productiongroup' in prod_df.columns:
+    prod_groups = sorted(prod_df['productiongroup'].dropna().unique())
+selected_area = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
 
-# Get data from session state (loaded in homepage or via the selector)
+# Force rerun if the selected area changes
+if 'weather_area' in st.session_state and st.session_state['weather_area'] != selected_area:
+    st.session_state['selected_area'] = selected_area
+    st.experimental_rerun()
+
+
+
+# Get selected area from session state (set by sidebar)
+sel_area = st.session_state.get('selected_area', 'NO5')
+# Ensure weather_year_session is always set
+if 'weather_year' not in st.session_state:
+    st.session_state['weather_year'] = '2021'
+weather_year_session = st.session_state['weather_year']
+
+
+# Check if weather data needs to be (re)fetched
+last_area = st.session_state.get('weather_area')
+last_year = st.session_state.get('weather_year_last')
 df = st.session_state.get('weather_data', None)
-sel_coords = st.session_state.get('selected_coordinates')
-sel_area = st.session_state.get('selected_area')
+if (df is None) or (last_area != sel_area) or (last_year != weather_year_session):
+    # Fetch new weather data for the selected area and year
+    from utils.fetch import load_weather_data
+    start_date = f"{weather_year_session}-01-01"
+    end_date = f"{weather_year_session}-12-31"
+    df = load_weather_data(sel_area, start=start_date, end=end_date)
+    st.session_state['weather_data'] = df
+    st.session_state['weather_area'] = sel_area
+    st.session_state['weather_year_last'] = weather_year_session
 
-if df is None:
-    st.info(f"No weather data cached for selected area `{sel_area}`.")
-    if sel_coords:
-        if st.button(f"Load weather for {sel_area} (lat={sel_coords[0]:.2f}, lon={sel_coords[1]:.2f})"):
-            # Fetch from Open-Meteo archive for the selected coordinates and year range (2021-2024)
-            lat, lon = sel_coords[0], sel_coords[1]
-            start_date = "2021-01-01"
-            end_date = "2024-12-31"
-            url = (
-                f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}"
-                f"&start_date={start_date}&end_date={end_date}"
-                f"&hourly=temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
-                f"&timezone=Europe/Oslo"
-            )
-            try:
-                resp = requests.get(url)
-                resp.raise_for_status()
-                data = resp.json()
-                wdf = pd.DataFrame({
-                    'time': pd.to_datetime(data['hourly']['time']),
-                    'temperature_2m': data['hourly']['temperature_2m'],
-                    'precipitation': data['hourly']['precipitation'],
-                    'wind_speed_10m': data['hourly']['wind_speed_10m'],
-                    'wind_direction_10m': data['hourly']['wind_direction_10m'],
-                    'wind_gusts_10m': data['hourly']['wind_gusts_10m']
-                })
-                st.session_state['weather_data'] = wdf
-                st.session_state['weather_area'] = sel_area
-                st.success(f"Loaded weather for {sel_area}")
-                # refresh local df variable
-                df = wdf
-            except Exception as e:
-                st.error(f"Failed to load weather: {e}")
-    else:
-        st.warning("No selected coordinates available. Please select a Price Area in the sidebar or click on the map.")
-        st.stop()
 if df is None:
     st.error("No weather data available. Please visit the homepage first to load the data.")
     st.stop()
+
+sel_coords = st.session_state.get('selected_coordinates')
 
 if df is not None:
     # Filter data for the first available month

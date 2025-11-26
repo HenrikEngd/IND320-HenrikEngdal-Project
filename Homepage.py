@@ -4,97 +4,15 @@ import streamlit as st
 import pandas as pd
 from pymongo.server_api import ServerApi
 import certifi
+from utils.fetch import load_data_from_mongodb
 
 st.set_page_config(
     page_title="IND320 - Data to Decision | Project Homepage",
     layout="centered"
 )
 
-# MongoDB connection
-@st.cache_resource
-def get_mongo_client():
-    """Create and return MongoDB client"""
-    db_user = st.secrets["database"]["db_user"]
-    secret = st.secrets["database"]["secret"]
-
-    uri = f"mongodb+srv://{db_user}:{secret}@cluster0.xxdbouc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-    # Use certifi CA bundle to avoid SSL CERTIFICATE_VERIFY_FAILED on macOS
-    client = MongoClient(
-        uri,
-        server_api=ServerApi('1'),
-        tls=True,
-        tlsCAFile=certifi.where(),
-    )
-    
-    # Test connection
-    try:
-        client.admin.command('ping')
-    except Exception as e:
-        st.error(f"MongoDB connection failed: {e}")
-    
-    return client
-
-# Load and process data
-@st.cache_data
-def load_ELHUB_Production_data():
-    """Load and process data from MongoDB"""
-    client = get_mongo_client()
-    
-    database = client['ELBHUB_Data'] 
-    collection = database['production_data']
-    
-    # Fetch all documents from MongoDB
-    # Only fetch first 10,000 documents and only needed fields
-    records = list(collection.find({}, {"_id": 0, "pricearea": 1, "productiongroup": 1, "starttime": 1, "quantitykwh": 1}))
-    if not records:
-        st.error("No data found in MongoDB!")
-        st.stop()
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(records)
-    
-    return df
-
-@st.cache_data
-def load_ELHUB_Consumption_data():
-    """Load and process consumption data from MongoDB"""
-    client = get_mongo_client()
-
-    database = client['ELBHUB_Data']
-    collection = database['consumption_data']
-
-    # Fetch all documents from MongoDB
-    records = list(collection.find({}, {'_id': 0}))
-    
-    if not records:
-        st.error("No consumption data found in MongoDB!")
-        st.stop()
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(records)
-    
-    # Convert date columns to datetime (with error handling)
-    try:
-        df['startTime'] = pd.to_datetime(df['startTime'], errors='coerce')
-        df['endTime'] = pd.to_datetime(df['endTime'], errors='coerce')
-        df['lastUpdatedTime'] = pd.to_datetime(df['lastUpdatedTime'], errors='coerce')
-        
-        # Remove rows where datetime conversion failed
-        df = df.dropna(subset=['startTime']).reset_index(drop=True)
-        
-        # Add month columns
-        df['month'] = df['startTime'].dt.month
-        df['month_name'] = df['startTime'].dt.strftime('%B')
-        
-    except Exception as e:
-        st.error(f"Error processing datetime columns: {e}")
-        st.stop()
-    
-    return df
-
-
-st.session_state['ELHUB_Production_data'] = load_ELHUB_Production_data()
-st.session_state['ELHUB_Consumption_data'] = load_ELHUB_Consumption_data()
+df_prod = load_data_from_mongodb('production')
+st.session_state['ELHUB_Production_data'] = df_prod
 
 
 st.markdown("""

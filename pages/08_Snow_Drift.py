@@ -162,7 +162,7 @@ def compute_fence_height(Qt, fence_type):
     H = (Qt_tonnes / factor) ** (1 / 2.2)
     return H
 
-# Prepare dataframe: add season column (season year = year if month >=7 else year-1)
+# Defining year to start at July 1:
 df = df.copy()
 df['season'] = df['time'].apply(lambda dt: dt.year if dt.month >= 7 else dt.year - 1)
 

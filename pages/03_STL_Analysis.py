@@ -24,15 +24,15 @@ def spectrogram_plot(
 	Returns:
 		Plotly Figure
 	"""
-	df = df[df['startTime'].dt.year == 2021].reset_index(drop=True)
+	df = df[df['starttime'].dt.year == 2021].reset_index(drop=True)
 	if group is None:
-		groups = df[df['priceArea'] == area]['productionGroup'].dropna().unique()
+		groups = df[df['pricearea'] == area]['productiongroup'].dropna().unique()
 		if len(groups) == 0:
 			raise ValueError(f"No production groups found for area {area}")
 		group = sorted(groups)[0]
-	ts = df[(df['priceArea'] == area) & (df['productionGroup'] == group)].copy()
-	ts = ts.sort_values('startTime')
-	y = ts['quantityKwh'].astype(float).values
+	ts = df[(df['pricearea'] == area) & (df['productiongroup'] == group)].copy()
+	ts = ts.sort_values('starttime')
+	y = ts['quantitykwh'].astype(float).values
 	if len(y) < window_len:
 		raise ValueError("Time series shorter than window length.")
 	fs = 1.0
@@ -68,16 +68,16 @@ def stl_decomposition_plot(
 	Returns:
 		Plotly Figure
 	"""
-	df = df[df['startTime'].dt.year == 2021].reset_index(drop=True)
+	df = df[df['starttime'].dt.year == 2021].reset_index(drop=True)
 	if group is None:
-		groups = df[df['priceArea'] == area]['productionGroup'].dropna().unique()
+		groups = df[df['pricearea'] == area]['productiongroup'].dropna().unique()
 		if len(groups) == 0:
 			raise ValueError(f"No production groups found for area {area}")
 		group = sorted(groups)[0]
-	ts = df[(df['priceArea'] == area) & (df['productionGroup'] == group)].copy()
-	ts = ts.sort_values('startTime')
-	y = ts['quantityKwh'].astype(float).values
-	x = ts['startTime']
+	ts = df[(df['pricearea'] == area) & (df['productiongroup'] == group)].copy()
+	ts = ts.sort_values('starttime')
+	y = ts['quantitykwh'].astype(float).values
+	x = ts['starttime']
 	if len(y) < max(2*period, seasonal+trend):
 		raise ValueError("Not enough points for STL with selected settings.")
 	res = STL(y, period=period, seasonal=seasonal, trend=trend, robust=robust).fit()
@@ -119,9 +119,9 @@ if df is None:
     st.error("No production data available. Please visit the homepage first to load the data.")
     st.stop()
 
-df = df[df['startTime'].dt.year == 2021].reset_index(drop=True)
-price_areas = sorted(df['priceArea'].dropna().unique())
-production_groups = sorted(df['productionGroup'].dropna().unique())
+df = df[df['starttime'].dt.year == 2021].reset_index(drop=True)
+price_areas = sorted(df['pricearea'].dropna().unique())
+production_groups = sorted(df['productiongroup'].dropna().unique())
 
 # Ensure the global sidebar selector is present and render group selector in the sidebar
 _ = price_area_sidebar(price_areas, default=st.session_state.get('selected_area', 'NO5'), groups=production_groups, group_key='selected_group')
