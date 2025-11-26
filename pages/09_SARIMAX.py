@@ -7,6 +7,7 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import os
 import json
+from utils.sidebar import price_area_sidebar
 
 # --- Load Data ---
 
@@ -33,6 +34,18 @@ def load_weather_data():
 st.title('SARIMAX Forecasting: Energy Production & Consumption')
 
 prod, cons = load_energy_data()
+
+# Derive available groups (prefer production groups if present)
+groups = None
+if prod is not None and 'productionGroup' in prod.columns:
+	groups = sorted(prod['productionGroup'].dropna().unique())
+elif cons is not None:
+	possible = [c for c in cons.columns if 'group' in c.lower() and c != 'priceArea']
+	if possible:
+		groups = sorted(cons[possible[0]].dropna().unique())
+
+# Render global price-area selector in the sidebar, including a group selector when available
+_ = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=groups, group_key='selected_group')
 weather = load_weather_data()
 
 tab = st.radio('Select data type:', ['Production', 'Consumption'])
@@ -78,6 +91,7 @@ st.info('SARIMAX parameters are fixed to: order=(1,1,1), seasonal_order=(1,1,1,1
 order = (1, 1, 1)
 seasonal_order = (1, 1, 1, 12)
 trend = 'c'
+
 
 # --- Prepare Data ---
 y = train_df[target_col]

@@ -4,6 +4,7 @@ import numpy as np
 from statsmodels.tsa.seasonal import STL
 from scipy.signal import spectrogram
 import plotly.graph_objects as go
+from utils.sidebar import price_area_sidebar
 
 def spectrogram_plot(
 	df,
@@ -103,6 +104,13 @@ st.set_page_config(page_title="STL & Spectrogram", layout="wide")
 
 st.title("STL Decomposition and Spectrogram")
 
+# Ensure global price area selector is present in the sidebar
+try:
+	# price_areas is not yet defined at module import, so call after df is available below
+	pass
+except Exception:
+	pass
+
 # Get area context from Page 2 if available
 default_area = st.session_state.get('selected_area', 'NO5')
 
@@ -114,6 +122,9 @@ if df is None:
 df = df[df['startTime'].dt.year == 2021].reset_index(drop=True)
 price_areas = sorted(df['priceArea'].dropna().unique())
 production_groups = sorted(df['productionGroup'].dropna().unique())
+
+# Ensure the global sidebar selector is present and render group selector in the sidebar
+_ = price_area_sidebar(price_areas, default=st.session_state.get('selected_area', 'NO5'), groups=production_groups, group_key='selected_group')
 
 tab_stl, tab_spec = st.tabs(["STL Decomposition", "Spectrogram"])
 

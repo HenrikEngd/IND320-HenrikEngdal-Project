@@ -4,6 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from sklearn.neighbors import LocalOutlierFactor
 from scipy.fftpack import dct, idct
+from utils.sidebar import price_area_sidebar
 def temp_spc_satv(times, temps, dct_cutoff=200, n_std=3.5, robust=True, scale_mad=True):
     # Defensive: check for empty input
     if len(temps) == 0:
@@ -94,6 +95,13 @@ def precip_lof(times, precip, contamination=0.01, n_neighbors=20):
 st.set_page_config(page_title="Outliers & Anomalies", layout="wide")
 
 st.title("Temperature SPC and Precipitation LOF")
+
+# Render global price area selector (will persist selection across pages)
+prod_df = st.session_state.get('ELHUB_Production_data')
+prod_groups = None
+if prod_df is not None and 'productionGroup' in prod_df.columns:
+    prod_groups = sorted(prod_df['productionGroup'].dropna().unique())
+_ = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
 
 # Expect weather data from Page 2
 df = st.session_state.get('weather_data')

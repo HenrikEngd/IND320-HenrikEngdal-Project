@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from utils.sidebar import price_area_sidebar
+import requests
 
 # Page configuration
 st.set_page_config(page_title="Weather Data Analysis", layout="wide")
@@ -10,9 +12,55 @@ st.set_page_config(page_title="Weather Data Analysis", layout="wide")
 st.title("Weather Data Analysis")
 st.markdown("---")
 
+# Ensure the global price-area selector is shown and session coords are kept in sync
+# If production groups are available in session data, expose them in the sidebar
+prod_df = st.session_state.get('ELHUB_Production_data')
+prod_groups = None
+if prod_df is not None and 'productionGroup' in prod_df.columns:
+    prod_groups = sorted(prod_df['productionGroup'].dropna().unique())
+_ = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
 
-# Get data from session state (loaded in homepage)
+# Get data from session state (loaded in homepage or via the selector)
 df = st.session_state.get('weather_data', None)
+sel_coords = st.session_state.get('selected_coordinates')
+sel_area = st.session_state.get('selected_area')
+
+if df is None:
+    st.info(f"No weather data cached for selected area `{sel_area}`.")
+    if sel_coords:
+        if st.button(f"Load weather for {sel_area} (lat={sel_coords[0]:.2f}, lon={sel_coords[1]:.2f})"):
+            # Fetch from Open-Meteo archive for the selected coordinates and year range (2021-2024)
+            lat, lon = sel_coords[0], sel_coords[1]
+            start_date = "2021-01-01"
+            end_date = "2024-12-31"
+            url = (
+                f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}"
+                f"&start_date={start_date}&end_date={end_date}"
+                f"&hourly=temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
+                f"&timezone=Europe/Oslo"
+            )
+            try:
+                resp = requests.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+                wdf = pd.DataFrame({
+                    'time': pd.to_datetime(data['hourly']['time']),
+                    'temperature_2m': data['hourly']['temperature_2m'],
+                    'precipitation': data['hourly']['precipitation'],
+                    'wind_speed_10m': data['hourly']['wind_speed_10m'],
+                    'wind_direction_10m': data['hourly']['wind_direction_10m'],
+                    'wind_gusts_10m': data['hourly']['wind_gusts_10m']
+                })
+                st.session_state['weather_data'] = wdf
+                st.session_state['weather_area'] = sel_area
+                st.success(f"Loaded weather for {sel_area}")
+                # refresh local df variable
+                df = wdf
+            except Exception as e:
+                st.error(f"Failed to load weather: {e}")
+    else:
+        st.warning("No selected coordinates available. Please select a Price Area in the sidebar or click on the map.")
+        st.stop()
 if df is None:
     st.error("No weather data available. Please visit the homepage first to load the data.")
     st.stop()
@@ -50,49 +98,7 @@ if df is not None:
     
     # Convert to DataFrame
     table_df = pd.DataFrame(table_data)
-    
-    st.subheader("Weather Parameters - First Month Analysis")
-    st.markdown("Each row shows statistics and trends for one weather parameter during January 2020")
-    
-    # Display the table
-    st.dataframe(
-        table_df,
-        column_config={
-            "Parameter": st.column_config.TextColumn(
-                "Weather Parameter",
-                help="The weather measurement parameter",
-                width="medium"
-            ),
-            "Mean": st.column_config.NumberColumn(
-                "Mean Value",
-                help="Average value for January 2020"
-            ),
-            "Min": st.column_config.NumberColumn(
-                "Minimum",
-                help="Lowest recorded value in January 2020"
-            ),
-            "Max": st.column_config.NumberColumn(
-                "Maximum", 
-                help="Highest recorded value in January 2020"
-            ),
-            "Std Dev": st.column_config.NumberColumn(
-                "Standard Deviation",
-                help="Standard deviation showing data variability"
-            ),
-            # using LineChartColumn for trend visualization
-            "First Month Trend": st.column_config.LineChartColumn(
-                "Trend",
-                help="Hourly trend visualization for the entire first month",
-                width="large"
-            )
-        },
-        width='stretch',
-        hide_index=True
-    )
 
-else:
-    st.error("Unable to load data. Please check if the data file exists and is properly formatted.")
-st.markdown("---")
 if df is not None:
     # Work on a local copy to avoid mutating cached data in session state
     df_local = df.copy()
@@ -115,6 +121,8 @@ if df is not None:
     
     # Create two columns for controls
     col1, col2 = st.columns([1, 1])
+
+    # Sidebar selector is rendered at the top of the page (keeps coordinates and groups in sync)
     
     with col1:
         st.subheader("Column Selection")

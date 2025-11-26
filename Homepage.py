@@ -40,12 +40,12 @@ def load_ELHUB_Production_data():
     """Load and process data from MongoDB"""
     client = get_mongo_client()
     
-    database = client['DB_Production_ELBHUB_Data'] 
-    collection = database['data']
+    database = client['ELBHUB_Data'] 
+    collection = database['production_data']
     
     # Fetch all documents from MongoDB
-    records = list(collection.find({}, {'_id': 0}))
-    
+    # Only fetch first 10,000 documents and only needed fields
+    records = list(collection.find({}, {"_id": 0, "pricearea": 1, "productiongroup": 1, "starttime": 1, "quantitykwh": 1}))
     if not records:
         st.error("No data found in MongoDB!")
         st.stop()
@@ -53,49 +53,16 @@ def load_ELHUB_Production_data():
     # Convert to DataFrame
     df = pd.DataFrame(records)
     
-    # Clean the data - remove any records with list or invalid values
-    def is_valid_record(row):
-        """Check if a record has valid data types"""
-        for col in ['startTime', 'endTime', 'lastUpdatedTime', 'priceArea', 'productionGroup', 'quantityKwh']:
-            if col in row and isinstance(row[col], list):
-                return False
-        return True
-    
-    # Filter out invalid records
-    valid_indices = df.apply(is_valid_record, axis=1)
-    initial_count = len(df)
-    df = df[valid_indices].reset_index(drop=True)
-    
-    if len(df) < initial_count:
-        st.warning(f"Filtered out {initial_count - len(df)} invalid records from the dataset.")
-    
-    # Convert date columns to datetime (with error handling)
-    try:
-        df['startTime'] = pd.to_datetime(df['startTime'], errors='coerce')
-        df['endTime'] = pd.to_datetime(df['endTime'], errors='coerce')
-        df['lastUpdatedTime'] = pd.to_datetime(df['lastUpdatedTime'], errors='coerce')
-        
-        # Remove rows where datetime conversion failed
-        df = df.dropna(subset=['startTime']).reset_index(drop=True)
-        
-        # Add month columns
-        df['month'] = df['startTime'].dt.month
-        df['month_name'] = df['startTime'].dt.strftime('%B')
-        
-    except Exception as e:
-        st.error(f"Error processing datetime columns: {e}")
-        st.stop()
-    
     return df
 
 @st.cache_data
 def load_ELHUB_Consumption_data():
     """Load and process consumption data from MongoDB"""
     client = get_mongo_client()
-    
-    database = client['DB_Consumption_ELBHUB_Data'] 
-    collection = database['data']
-    
+
+    database = client['ELBHUB_Data']
+    collection = database['consumption_data']
+
     # Fetch all documents from MongoDB
     records = list(collection.find({}, {'_id': 0}))
     

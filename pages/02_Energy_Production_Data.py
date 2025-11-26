@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import requests
+from utils.sidebar import price_area_sidebar
 
 st.set_page_config(page_title="Energy Production Data", layout="wide")
 
@@ -21,45 +22,54 @@ AREA_COORDINATES = {
 } 
 # Load and cache data globally
 @st.cache_data
-def load_weather_data(price_area: str, year: str = '2021'):
-    """Load weather data from Open-Meteo API based on price area and year"""
+def load_weather_data(price_area: str = None, lat: float = None, lon: float = None, start: str = '2021', end: str = '2024'):
+    """Load weather data from Open-Meteo API based on price area or lat/lon and year"""
     try:
-        if price_area not in AREA_COORDINATES:
-            st.error(f"Unknown price area: {price_area}")
+        coords = None
+        if lat is not None and lon is not None:
+            coords = {'latitude': lat, 'longitude': lon}
+        elif price_area is not None:
+            if price_area not in AREA_COORDINATES:
+                st.error(f"Unknown price area: {price_area}")
+                return None
+            coords = AREA_COORDINATES[price_area]
+
+        if coords is None:
+            st.error("No coordinates supplied to load weather data")
             return None
 
-        coords = AREA_COORDINATES[price_area]
-
         # Build Open-Meteo API URL for selected year
-        year_str = str(year)
+        start_date = f"{start}-01-01"
+        end_date = f"{end}-12-31"
         url = (
             f"https://archive-api.open-meteo.com/v1/archive?"
             f"latitude={coords['latitude']}&longitude={coords['longitude']}"
-            f"&start_date={year_str}-01-01&end_date={year_str}-12-31"
-            f"&hourly=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
+            f"&start_date={start_date}&end_date={end_date}"
+            f"&hourly=temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
             f"&timezone=Europe/Oslo"
         )
-        
+
         # Fetch data from API
         response = requests.get(url)
-        
+
         if response.status_code != 200:
             st.error(f"API request failed with status code: {response.status_code}")
             return None
-        
+
         data = response.json()
-        
+
         # Convert to DataFrame
         df = pd.DataFrame({
             'time': pd.to_datetime(data['hourly']['time']),
             'temperature_2m': data['hourly']['temperature_2m'],
-            'relative_humidity_2m': data['hourly']['relative_humidity_2m'],
             'precipitation': data['hourly']['precipitation'],
-            'wind_speed_10m': data['hourly']['wind_speed_10m']
+            'wind_speed_10m': data['hourly']['wind_speed_10m'],
+            'wind_direction_10m': data['hourly']['wind_direction_10m'],
+            'wind_gusts_10m': data['hourly']['wind_gusts_10m']
         })
-        
+
         return df
-        
+
     except Exception as e:
         st.error(f"Error loading weather data: {str(e)}")
         return None
@@ -87,27 +97,25 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Total Production by Type")
 
-    # Radio with default from session
-    selected_area_default = selected_area_session if selected_area_session in price_areas else price_areas[0]
-    selected_area = st.radio(
-        "Select Price Area:",
-        options=price_areas,
-        horizontal=True,
-        index=price_areas.index(selected_area_default)
-    )
-
-    # Update session state selections
+    # Use global sidebar price-area selector (stored in session_state) and include production groups
+    selected_area = price_area_sidebar(price_areas, area_coords=AREA_COORDINATES, default=selected_area_session, groups=production_groups, group_key='selected_group')
+    # Ensure other session values are synced
     st.session_state['selected_area'] = selected_area
     st.session_state['selected_city'] = AREA_COORDINATES.get(selected_area, {}).get('name', selected_city_session)
     st.session_state['weather_year'] = weather_year_session  # keep existing year
 
     # Refresh weather data if missing or area/year changed
+    # Prefer using selected_coordinates (from sidebar or map) to load weather; fallback to selected_area
+    sel_coords = st.session_state.get('selected_coordinates')
     if (
         ('weather_data' not in st.session_state)
         or (st.session_state.get('weather_area') != selected_area)
         or (str(st.session_state.get('weather_year')) != str(weather_year_session))
     ):
-        wdf = load_weather_data(selected_area, weather_year_session)
+        if sel_coords:
+            wdf = load_weather_data(lat=sel_coords[0], lon=sel_coords[1], start=weather_year_session, end=weather_year_session)
+        else:
+            wdf = load_weather_data(selected_area, start=weather_year_session, end=weather_year_session)
         if wdf is not None:
             st.session_state['weather_data'] = wdf
             st.session_state['weather_area'] = selected_area
@@ -160,17 +168,14 @@ with col1:
 with col2:
     st.subheader("Production Over Time")
     
-    # Pills for production group selection
-    selected_groups = st.pills(
-        "Select Production Groups:",
-        options=production_groups,
-        selection_mode="multi",
-        default=production_groups[:5]  # Default to  5 groups
-    )
-    
-    # Ensure at least one group is selected
-    if not selected_groups:
-        selected_groups = [production_groups[0]]
+    # Read selected group(s) from sidebar session key
+    # Sidebar stores a single selected group under 'selected_group'; to support multiple groups, keep this as a single-item list
+    sel_group = st.session_state.get('selected_group')
+    if sel_group and sel_group != 'All groups':
+        selected_groups = [sel_group]
+    else:
+        # All groups selected -> default to all production groups
+        selected_groups = production_groups
     
     # Month selection - show all 12 months
     selected_month = st.selectbox(
