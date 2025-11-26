@@ -34,10 +34,10 @@ def get_mongo_client():
 def load_ELHUB_Production_data():
     """Load and process data from MongoDB"""
     client = get_mongo_client()
-    
-    database = client['DB_Production_ELBHUB_Data'] 
-    collection = database['data']
-    
+
+    database = client['ELBHUB_Data']
+    collection = database['production_data']
+
     # Fetch all documents from MongoDB
     records = list(collection.find({}, {'_id': 0}))
     
@@ -87,10 +87,10 @@ def load_ELHUB_Production_data():
 def load_ELHUB_Consumption_data():
     """Load and process consumption data from MongoDB"""
     client = get_mongo_client()
-    
-    database = client['DB_Consumption_ELBHUB_Data'] 
-    collection = database['data']
-    
+
+    database = client['ELBHUB_Data']
+    collection = database['consumption_data']
+
     # Fetch all documents from MongoDB
     records = list(collection.find({}, {'_id': 0}))
     
