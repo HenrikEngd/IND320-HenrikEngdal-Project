@@ -1,11 +1,12 @@
 import streamlit as st
+st.set_page_config(page_title="Outliers & Anomalies", layout="wide")
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from sklearn.neighbors import LocalOutlierFactor
 from scipy.fftpack import dct, idct
 from utils.sidebar import price_area_sidebar
-def temp_spc_satv(times, temps, dct_cutoff=200, n_std=3.5, robust=True, scale_mad=True):
+def temp_spc_satv(times, temps, dct_cutoff=10, n_std=2.5, robust=True, scale_mad=True):
     # Defensive: check for empty input
     if len(temps) == 0:
         raise ValueError("Temperature array is empty.")
@@ -73,6 +74,20 @@ def temp_spc_satv(times, temps, dct_cutoff=200, n_std=3.5, robust=True, scale_ma
     }
     return fig, is_outlier, summary
 
+weather_year = int(st.session_state.get('weather_year', 2021))
+selected_area = st.session_state.get('selected_area', 'NO5')
+last_area = st.session_state.get('weather_area')
+last_year = st.session_state.get('weather_year_last')
+df = st.session_state.get('weather_data', None)
+if (df is None) or (last_area != selected_area) or (last_year != weather_year):
+    from utils.fetch import load_weather_data
+    start_date = f"{weather_year}-01-01"
+    end_date = f"{weather_year}-12-31"
+    df = load_weather_data(selected_area, start=start_date, end=end_date)
+    st.session_state['weather_data'] = df
+    st.session_state['weather_area'] = selected_area
+    st.session_state['weather_year_last'] = weather_year
+
 def precip_lof(times, precip, contamination=0.01, n_neighbors=20):
     arr = np.array(precip, dtype=float).reshape(-1, 1)
     t = np.asarray(times)
@@ -92,7 +107,7 @@ def precip_lof(times, precip, contamination=0.01, n_neighbors=20):
     }
     return fig, is_outlier, summary
 
-st.set_page_config(page_title="Outliers & Anomalies", layout="wide")
+
 
 st.title("Temperature SPC and Precipitation LOF")
 
@@ -101,24 +116,38 @@ prod_df = st.session_state.get('ELHUB_Production_data')
 prod_groups = None
 if prod_df is not None and 'productiongroup' in prod_df.columns:
     prod_groups = sorted(prod_df['productiongroup'].dropna().unique())
-selected_area = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
 
-# Force rerun if the selected area changes
-if 'weather_area' in st.session_state and st.session_state['weather_area'] != selected_area:
-    st.session_state['selected_area'] = selected_area
-    st.experimental_rerun()
 
-# Expect weather data from Page 2
-df = st.session_state.get('weather_data')
+weather_year = int(st.session_state.get('weather_year', 2021))
 selected_area = st.session_state.get('selected_area', 'NO5')
-selected_city = st.session_state.get('selected_city', 'Bergen')
-weather_year = st.session_state.get('weather_year', '2021')
+last_area = st.session_state.get('weather_area')
+last_year = st.session_state.get('weather_year_last')
+df = st.session_state.get('weather_data', None)
+if df is None or last_area != selected_area or last_year != weather_year:
+    from utils.fetch import load_weather_data
+    start_date = f"{weather_year}-01-01"
+    end_date = f"{weather_year}-12-31"
+    df = load_weather_data(selected_area, start=start_date, end=end_date)
+    st.session_state['weather_data'] = df
+    st.session_state['weather_area'] = selected_area
+    st.session_state['weather_year_last'] = weather_year
 
+# Year and area selector in sidebar with refresh button
+with st.sidebar:
+    years = list(range(2021, 2025))
+    default_year = 2024
+    selected_area = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'))
+    st.session_state['selected_area'] = selected_area
+    selected_year = st.selectbox('Select Year', years, index=years.index(default_year) if default_year in years else 0)
+    st.session_state['weather_year'] = selected_year
 
+# Get city name from price area (after selected_area is set)
+from utils.fetch import AREA_COORDINATES
+selected_city = AREA_COORDINATES.get(selected_area, {}).get('name', selected_area)
 st.caption(f"Context — Area: {selected_area}, City: {selected_city}, Year: {weather_year}")
 
 if df is None or df.empty:
-    st.error("Weather data not loaded. Please visit the Energy Production Analysis page first.")
+    st.error("Weather data not loaded. Please visit the Energy Production Analysis page first and click 'Refresh Plot'.")
     st.stop()
 
 tab_spc, tab_lof = st.tabs(["Temperature SPC", "Precipitation LOF"])
@@ -126,9 +155,9 @@ tab_spc, tab_lof = st.tabs(["Temperature SPC", "Precipitation LOF"])
 with tab_spc:
     st.subheader("Temperature Outlier Detection (SPC with DCT High-Pass)")
     # UI controls for SPC parameters
-    dct_cutoff = st.slider("DCT frequency cutoff", min_value=10, max_value=1000, value=200, step=1,
+    dct_cutoff = st.slider("DCT frequency cutoff", min_value=10, max_value=250, value=50, step=1,
         help="Number of low DCT frequencies to remove (higher = more aggressive outlier detection)")
-    n_std = st.slider("SPC n_std (threshold)", min_value=1.0, max_value=5.0, value=3.5, step=0.1,
+    n_std = st.slider("SPC n_std (threshold)", min_value=1.0, max_value=5.0, value=2.5, step=0.1,
         help="Number of robust standard deviations for outlier boundary")
     temp_candidates = [c for c in df.columns if c.startswith('temperature')]
     temp_col = temp_candidates[0] if temp_candidates else None

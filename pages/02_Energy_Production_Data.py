@@ -9,25 +9,27 @@ from utils.fetch import AREA_COORDINATES
 st.set_page_config(page_title="Energy Production Data", layout="wide")
 
 # Read session-cached values (set by other pages) with safe defaults
-weather_df_session = st.session_state.get('weather_data')
 selected_area_session = st.session_state.get('selected_area', 'NO5')
 selected_city_session = st.session_state.get('selected_city', 'Bergen')
 weather_year_session = st.session_state.get('weather_year', '2021')
 
 
-year = str(weather_year_session)
-start_date = f"{year}-01-01"
-end_date = f"{year}-12-31"
-wdf = load_weather_data(selected_area_session, start=start_date, end=end_date)
-
-# Load data and filter to only 2021
+# Load data
 df = st.session_state.get('ELHUB_Production_data')
 
 if df is None:
     st.error("No production data available. Please visit the homepage first to load the data.")
     st.stop()
 
-df = df[df['starttime'].dt.year == 2021].reset_index(drop=True)
+# Add year column if not present
+if 'year' not in df.columns:
+    df['year'] = df['starttime'].dt.year
+
+
+# Create two columns
+col1, col2 = st.columns(2)
+
+
 
 # Add this to ensure 'month' exists
 if 'month' not in df.columns:
@@ -46,6 +48,11 @@ col1, col2 = st.columns(2)
 # Pie Chart
 with col1:
     st.subheader("Total Production by Type")
+    years = list(range(2021, 2025))
+    selected_year = st.selectbox("Select Year:", options=years, index=years.index(2021) if 2021 in years else 0)
+
+    # Filter to selected year (after selection)
+    df = df[df['year'] == selected_year].reset_index(drop=True)
 
     # Use global sidebar price-area selector (stored in session_state) and include production groups
     selected_area = price_area_sidebar(price_areas, area_coords=AREA_COORDINATES, default=selected_area_session, groups=production_groups, group_key='selected_group')
@@ -57,17 +64,6 @@ with col1:
     # Refresh weather data if missing or area/year changed
     # Prefer using selected_coordinates (from sidebar or map) to load weather; fallback to selected_area
     sel_coords = st.session_state.get('selected_coordinates')
-    if (
-        ('weather_data' not in st.session_state)
-        or (st.session_state.get('weather_area') != selected_area)
-        or (str(st.session_state.get('weather_year')) != str(weather_year_session))
-    ):
-        if sel_coords:
-            wdf = load_weather_data(selected_area, start=weather_year_session, end=weather_year_session)
-        if wdf is not None:
-            st.session_state['weather_data'] = wdf
-            st.session_state['weather_area'] = selected_area
-            st.session_state['weather_year'] = weather_year_session
 
     area_data = df[df['pricearea'] == selected_area]
     production_summary = area_data.groupby('productiongroup')['quantitykwh'].sum().reset_index()

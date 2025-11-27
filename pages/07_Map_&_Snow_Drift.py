@@ -1,7 +1,8 @@
-
-# Calculate snow drift per year in a selected range of years
-# Let user choose the year range
-# Use the coordinates chosen on the Price Area Map page. Dont calculate/plot if no selection made.
+# --- Begin: Moved from 07_Price_Area_Map.py ---
+import folium
+from streamlit_folium import st_folium
+import json
+from shapely.geometry import shape, Point
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -10,7 +11,122 @@ import plotly.graph_objects as go
 from math import pow
 from utils.sidebar import price_area_sidebar
 
-st.title("Snow Drift Analysis")
+# Load GeoJSON data
+@st.cache_data
+def load_geojson():
+    with open('assets/file.geojson', 'r') as f:
+        geojson_data = json.load(f)
+    return geojson_data
+
+geojson_data = load_geojson()
+
+# Find correct name for area
+@st.cache_data
+def build_id_to_name(gj):
+    out = {}
+    for f in gj.get("features", []):
+        fid = f.get("id") or (f.get("properties") or {}).get("id")
+        if fid is None:
+            continue
+        name = (f.get("properties") or {}).get("ElSpotOmr")
+        if name:
+            out[fid] = str(name)
+    return out
+
+id_to_name = build_id_to_name(geojson_data)
+
+# Build shapely polygons once (session cache)
+if "polygons" not in st.session_state:
+    polys = []
+    for feat in geojson_data.get("features", []):
+        fid = feat.get("id") or (feat.get("properties") or {}).get("id")
+        if not fid:
+            continue
+        try:
+            geom = shape(feat["geometry"])
+        except Exception:
+            continue
+        polys.append((fid, geom))
+    st.session_state.polygons = polys
+
+def find_feature_id(lon: float, lat: float):
+    if shape is None or "polygons" not in st.session_state:
+        return None
+    pt = Point(lon, lat)  # shapely uses (x,y) = (lon,lat)
+    for fid, geom in st.session_state.polygons:
+        if geom.covers(pt):  # boundary-inclusive
+            return fid
+    return None
+
+# Choropleth values (example; replace with real data)
+value_map = {6: 5.0, 7: 3.5, 8: 4.2, 9: 6.1, 10: 2.8}
+df_vals = pd.DataFrame({"id": list(value_map.keys()), "value": list(value_map.values())})
+
+# Session state init
+if "selected_coordinates" not in st.session_state:
+    st.session_state.selected_coordinates = [66.32624933088354, 14.186465980232347]
+if "selected_feature_id" not in st.session_state:
+    st.session_state.selected_feature_id = None
+
+# Preselect area for the initial pin (no click required)
+if st.session_state.selected_feature_id is None:
+    lat, lon = st.session_state.selected_coordinates
+    st.session_state.selected_feature_id = find_feature_id(lon, lat)
+
+# Layout: map left, info right
+
+# --- Map takes full width ---
+# Build map (one per run)
+m = folium.Map(location=st.session_state.selected_coordinates, zoom_start=5, tiles="OpenStreetMap")
+
+# Choropleth (single layer)
+folium.Choropleth(
+    geo_data=geojson_data,
+    data=df_vals,
+    columns=["id", "value"],
+    key_on="feature.id",
+    fill_color="YlGnBu",
+    fill_opacity=0.4,
+    line_opacity=0.8,
+    line_color="white",
+    legend_name="Value",
+    highlight=True
+).add_to(m)
+
+# Highlight the selected polygon outline (pre-filtered; no filter_function)
+if st.session_state.selected_feature_id is not None:
+    sel_id = st.session_state.selected_feature_id
+    sel_feats = [
+        f for f in geojson_data.get("features", [])
+        if f.get("id") == sel_id or (f.get("properties") or {}).get("id") == sel_id
+    ]
+    if sel_feats:
+        folium.GeoJson(
+            {"type": "FeatureCollection", "features": sel_feats},
+            style_function=lambda f: {"fillOpacity": 0, "color": "red", "weight": 3},
+            name="selection"
+        ).add_to(m)
+
+# Single pin (last clicked)
+folium.Marker(
+    location=st.session_state.selected_coordinates,
+    icon=folium.Icon(color="red"),
+    popup=f"{st.session_state.selected_coordinates[0]:.5f}, {st.session_state.selected_coordinates[1]:.5f}"
+).add_to(m)
+
+# Render map at full width
+out = st_folium(m, key="choropleth_map", height=600, width=1200)
+
+# Process click: update pin and polygon ID, then single rerun
+if out and out.get("last_clicked"):
+    lat = out["last_clicked"]["lat"]
+    lon = out["last_clicked"]["lng"]
+    new_coord = [lat, lon]
+    if new_coord != st.session_state.selected_coordinates:
+        st.session_state.selected_coordinates = new_coord
+        st.session_state.selected_feature_id = find_feature_id(lon, lat)
+        st.rerun()
+
 
 # Ensure sidebar selector is present for global price-area selection
 # Snow drift does not have production groups, but if production groups are available in session, expose them
@@ -20,6 +136,18 @@ if prod_df is not None and 'productionGroup' in prod_df.columns:
     prod_groups = sorted(prod_df['productionGroup'].dropna().unique())
 _ = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'), groups=prod_groups, group_key='selected_group')
 
+# --- Selection info now in sidebar ---
+from utils.sidebar import show_map_selection_info
+show_map_selection_info(
+    st.session_state.selected_coordinates,
+    st.session_state.selected_feature_id,
+    value_map,
+    id_to_name
+)
+
+st.title("Snow Drift Analysis")
+
+# --- End: Moved from 07_Price_Area_Map.py ---
 # Let user choose year range (years correspond to the season start year, e.g. 2021 -> season 1 Jul 2021 - 30 Jun 2022)
 start_year, end_year = st.slider("Select Year Range", 2020, 2024, (2021, 2024))
 
@@ -29,8 +157,6 @@ if "selected_coordinates" not in st.session_state:
     st.stop()
 
 lat, lon = st.session_state.selected_coordinates
-
-CSV_PATH = "assets/open-meteo-subset.csv"
 
 def normalize_weather_df(raw_df: pd.DataFrame) -> pd.DataFrame:
     """Normalize an incoming weather dataframe (either from session or CSV) to expected column names.
@@ -89,23 +215,13 @@ def normalize_weather_df(raw_df: pd.DataFrame) -> pd.DataFrame:
     return df2
 
 # Prefer cached session weather_data if present
-raw_df = st.session_state.get('weather_data', None)
-used_source = 'session'
-if raw_df is None:
-    try:
-        raw_df = pd.read_csv(CSV_PATH)
-        used_source = 'csv'
-    except Exception as e:
-        st.error(f"Unable to load weather data from session or CSV: {e}")
-        st.stop()
+df_weather = st.session_state.get('weather_data')
 
 try:
-    df = normalize_weather_df(raw_df)
+    df = normalize_weather_df(df_weather)
 except KeyError as e:
     st.error(f"Weather data missing required column: {e}")
     st.stop()
-
-st.write(f"Using weather data from: `{used_source}` — rows: {len(df):,}")
 
 # We expect these columns (based on assets/open-meteo-subset.csv)
 expected_cols = ['time', 'temperature_2m (°C)', 'precipitation (mm)', 'wind_speed_10m (m/s)', 'wind_direction_10m (°)']
@@ -284,9 +400,5 @@ st.plotly_chart(rose_fig, use_container_width=True)
 
 st.subheader("Fence Height Estimates")
 st.dataframe(fence_df)
-
-st.markdown("---")
-st.caption("Snow drift calculations adapted from Snow_drift.py (Tabler, 2003). Using assets/open-meteo-subset.csv for meteorological inputs.")
-
 
 

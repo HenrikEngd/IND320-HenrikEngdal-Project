@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from pymongo.server_api import ServerApi
 import certifi
-from utils.fetch import load_data_from_mongodb
+from utils.fetch import load_data_from_mongodb, load_weather_data
 
 st.set_page_config(
     page_title="IND320 - Data to Decision | Project Homepage",
@@ -15,6 +15,8 @@ df_prod = load_data_from_mongodb('production_data')
 st.session_state['ELHUB_Production_data'] = df_prod
 df_cons = load_data_from_mongodb('consumption_data')
 st.session_state['ELHUB_Consumption_data'] = df_cons
+df_weather = load_weather_data(pricearea=None, start="2021-01-01", end="2024-12-31") #None -> Loads all areas
+st.session_state['weather_data'] = df_weather
 
 
 st.markdown("""

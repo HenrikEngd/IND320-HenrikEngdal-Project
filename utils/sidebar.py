@@ -1,3 +1,23 @@
+# --- Map selection info for sidebar ---
+import streamlit as st
+
+def show_map_selection_info(selected_coordinates, selected_feature_id, value_map, id_to_name):
+    with st.sidebar:
+        st.subheader("Selection")
+        st.write(f"Lat: {selected_coordinates[0]:.6f}")
+        st.write(f"Lon: {selected_coordinates[1]:.6f}")
+
+        if selected_feature_id is None:
+            st.write("Outside known features.")
+        else:
+            fid = selected_feature_id
+            # If your value_map uses int keys and fid is str, this handles both
+            try:
+                val = value_map.get(fid, value_map.get(int(fid), "n/a"))
+            except Exception:
+                val = value_map.get(fid, "n/a")
+            area_name = id_to_name.get(fid, f"ID {fid}")
+            st.write(f"Value: {val}")
 import math
 import inspect
 import os

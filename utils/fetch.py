@@ -44,41 +44,49 @@ def load_data_from_mongodb(collection_name: str) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=3600, show_spinner="Fetching weather data...")
-def load_weather_data(pricearea, start, end) -> pd.DataFrame:
+def load_weather_data(pricearea=None, start="2021-01-01", end="2024-12-31") -> pd.DataFrame:
     """Load weather data from Open-Meteo API based on price area or lat/lon and year"""
+    if pricearea is None:
+        priceareas = ['NO1', 'NO2', 'NO3', 'NO4', 'NO5']
+    elif isinstance(pricearea, str):
+        priceareas = [pricearea]
+    else:
+        priceareas = list(pricearea)
 
-    area = pricearea.upper()
-    if area not in AREA_COORDINATES:
-        raise ValueError(f"Price Area {area} not found in coordinates dictionary.")
-        
-    latitude = AREA_COORDINATES[area]['latitude']
-    longitude = AREA_COORDINATES[area]['longitude']  # Lookup coordinates
-    hourly_variables = ["temperature_2m", "precipitation", "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m"]
+    all_dfs = []
+    for area in priceareas:
+        area = area.upper()
+        if area not in AREA_COORDINATES:
+            raise ValueError(f"Price Area {area} not found in coordinates dictionary.")
+
+        latitude = AREA_COORDINATES[area]['latitude']
+        longitude = AREA_COORDINATES[area]['longitude']  # Lookup coordinates
+        hourly_variables = ["temperature_2m", "precipitation", "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m"]
     
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "start_date": start,
-        "end_date": end,
-        "hourly": hourly_variables,
-        "models": "era5",
-    }
-       
-    responses = openmeteo_client.weather_api(BASE_WEATHER_URL, params=params)
-    response = responses[0]
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "start_date": start,
+            "end_date": end,
+            "hourly": hourly_variables,
+            "models": "era5",
+        }
 
-    hourly = response.Hourly()
-    hourly_data = {
-        "time": pd.date_range(
-            start=pd.to_datetime(hourly.Time(), unit="s"),
-            end=pd.to_datetime(hourly.TimeEnd(), unit="s"),
-            freq=pd.Timedelta(seconds=hourly.Interval()),
-            inclusive="left"
-        )
-    }
-    for i, var in enumerate(hourly_variables):
-        hourly_data[var] = hourly.Variables(i).ValuesAsNumpy()
+        responses = openmeteo_client.weather_api(BASE_WEATHER_URL, params=params)
+        response = responses[0]
 
-    df = pd.DataFrame(hourly_data)
-    # Do NOT set 'time' as index, keep it as a column
-    return df
+        hourly = response.Hourly()
+        hourly_data = {
+            "time": pd.date_range(
+                start=pd.to_datetime(hourly.Time(), unit="s"),
+                end=pd.to_datetime(hourly.TimeEnd(), unit="s"),
+                freq=pd.Timedelta(seconds=hourly.Interval()),
+                inclusive="left"
+            )
+        }
+        for i, var in enumerate(hourly_variables):
+            hourly_data[var] = hourly.Variables(i).ValuesAsNumpy()
+        df = pd.DataFrame(hourly_data)
+        df["pricearea"] = area
+        all_dfs.append(df)
+    return pd.concat(all_dfs, ignore_index=True)
