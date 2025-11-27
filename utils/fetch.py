@@ -29,15 +29,19 @@ openmeteo_client = openmeteo_requests.Client(session=retry_session)
 def load_data_from_mongodb(collection_name: str) -> pd.DataFrame:
     uri = st.secrets["database"]["uri"]
     client = MongoClient(uri, server_api=ServerApi('1'))
+    try:
+        db = client[st.secrets["database"]["db_name"]]
+        col = db[collection_name]
+        items = list(col.find({}, {'_id': 0}))
+        df = pd.DataFrame(items)
+        df.columns = [c.lower() for c in df.columns]
+        return df
+    except Exception as e:
+        st.error(f"Error fetching data from MongoDB: {e}")
+        df = pd.DataFrame()
+    finally:
+        client.close()
 
-    db = client[st.secrets["database"]["db_name"]]
-    col = db[collection_name]
-    items = list(col.find({}, {'_id': 0}).limit(2000))
-    df = pd.DataFrame(items)
-    client.close()
-
-    df.columns = [c.lower() for c in df.columns]
-    return df
 
 @st.cache_data(ttl=3600, show_spinner="Fetching weather data...")
 def load_weather_data(pricearea, start, end) -> pd.DataFrame:

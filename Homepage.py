@@ -11,8 +11,10 @@ st.set_page_config(
     layout="centered"
 )
 
-df_prod = load_data_from_mongodb('production')
+df_prod = load_data_from_mongodb('production_data')
 st.session_state['ELHUB_Production_data'] = df_prod
+df_cons = load_data_from_mongodb('consumption_data')
+st.session_state['ELHUB_Consumption_data'] = df_cons
 
 
 st.markdown("""

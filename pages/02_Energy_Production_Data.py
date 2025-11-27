@@ -15,10 +15,14 @@ selected_city_session = st.session_state.get('selected_city', 'Bergen')
 weather_year_session = st.session_state.get('weather_year', '2021')
 
 
-st.session_state['weather_data'] = load_weather_data(selected_area_session, start="2021-01-01", end="2024-12-31")
+year = str(weather_year_session)
+start_date = f"{year}-01-01"
+end_date = f"{year}-12-31"
+wdf = load_weather_data(selected_area_session, start=start_date, end=end_date)
 
 # Load data and filter to only 2021
-df = st.session_state.get('ELHUB_Production_data', None)
+df = st.session_state.get('ELHUB_Production_data')
+
 if df is None:
     st.error("No production data available. Please visit the homepage first to load the data.")
     st.stop()
@@ -58,10 +62,8 @@ with col1:
         or (st.session_state.get('weather_area') != selected_area)
         or (str(st.session_state.get('weather_year')) != str(weather_year_session))
     ):
-        # Ensure weather_year_session is a string year (e.g., '2021')
-        start_date = f"{weather_year_session}-01-01"
-        end_date = f"{weather_year_session}-12-31"
-        wdf = load_weather_data(selected_area, start=start_date, end=end_date)
+        if sel_coords:
+            wdf = load_weather_data(selected_area, start=weather_year_session, end=weather_year_session)
         if wdf is not None:
             st.session_state['weather_data'] = wdf
             st.session_state['weather_area'] = selected_area
