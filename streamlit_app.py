@@ -1,9 +1,4 @@
-from pymongo import MongoClient
-import requests
 import streamlit as st
-import pandas as pd
-from pymongo.server_api import ServerApi
-import certifi
 from utils.fetch import load_data_from_mongodb, load_weather_data
 
 st.set_page_config(

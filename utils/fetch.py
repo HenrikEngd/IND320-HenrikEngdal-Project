@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import requests 
 import requests_cache
 from retry_requests import retry
 import openmeteo_requests
