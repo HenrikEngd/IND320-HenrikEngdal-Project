@@ -22,7 +22,16 @@ st.session_state['weather_data'] = df_weather
 st.markdown("""
 ### Project Overview
 This project is part of the course "IND320 - Data to Decision" at the Norwegian University of Life Sciences.
-The application demonstrates data loading, processing, and visualization using Streamlit, Plotly, Spark, and MongoDB.
+The application demonstrates a complete data pipeline for energy analytics, including data ingestion, processing, storage, and interactive visualization.
+
+**Key Features:**
+- Load and explore Norwegian energy production and consumption data
+- Integrate and analyze weather data alongside energy datasets
+- Perform distributed data processing and aggregations using Spark
+- Visualize trends, correlations, and statistics with interactive Plotly charts
+- Filter, group, and compare data by region, time, and energy type
+- Download processed datasets for further analysis
+- Interactive dashboards and data exploration with Streamlit
 
 **Data Sources:**
 - Weather data from [Open-Meteo](https://open-meteo.com/)
@@ -35,10 +44,4 @@ The application demonstrates data loading, processing, and visualization using S
 - **Spark**: Distributed data processing and aggregations
 - **MongoDB**: Cloud database for energy production / consumption data
 - **Cassandra**: Distributed NoSQL database integration
-          
-### Data Pipeline
-```
-API → JSON → Pandas → Spark (aggregations) → MongoDB → Streamlit
-```
-The energy production / consumption data is processed using Spark for distributed aggregations, stored in MongoDB Atlas, and visualized with interactive Plotly charts.
 """)
