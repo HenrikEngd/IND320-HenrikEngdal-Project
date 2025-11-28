@@ -11,3 +11,4 @@ requests-cache
 retry-requests
 folium
 streamlit-folium
+openmeteo_requests
