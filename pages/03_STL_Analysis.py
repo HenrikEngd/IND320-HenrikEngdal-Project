@@ -79,7 +79,7 @@ def stl_decomposition_plot(
 	y = ts['quantitykwh'].astype(float).values
 	x = ts['starttime']
 	if len(y) < max(2*period, seasonal+trend):
-		raise ValueError("Not enough points for STL with selected settings.")
+		raise ValueError("Specify group in the sidebar selection.")
 	res = STL(y, period=period, seasonal=seasonal, trend=trend, robust=robust).fit()
 	# Create a separate figure for each component
 	fig_obs = go.Figure()
@@ -130,18 +130,18 @@ tab_stl, tab_spec = st.tabs(["STL Decomposition", "Spectrogram"])
 
 with tab_stl:
 	st.subheader("Seasonal-Trend Decomposition (STL)")
-	c1, c2, c3, c4, c5 = st.columns([1,1,1,1,1])
+	c1, c2, c3 = st.columns([1,1,1])
 	with c1:
-		area = st.selectbox("Price Area", options=price_areas, index=price_areas.index(default_area) if default_area in price_areas else 0)
-	with c2:
-		group = st.selectbox("Production Group", options=production_groups, index=0)
-	with c3:
 		period = st.number_input("Period (hours)", min_value=24, max_value=24*14, value=24, step=1)
-	with c4:
+	with c2:
 		seasonal = st.slider("Seasonal smoother", min_value=7, max_value=61, value=13, step=2)
-	with c5:
-		trend = st.slider("Trend smoother", min_value=13, max_value=121, value=25, step=2)
+	with c3:
+		trend = st.slider("Trend smoother", min_value=period+1, max_value=121, value=period+1, step=2)
 	robust = st.checkbox("Robust", value=True)
+
+	# Use area and group from sidebar (session_state)
+	area = st.session_state.get('selected_area', default_area)
+	group = st.session_state.get('selected_group', None)
 
 	try:
 		fig_obs, fig_seasonal, fig_trend, fig_resid = stl_decomposition_plot(
@@ -155,12 +155,8 @@ with tab_stl:
 
 with tab_spec:
 	st.subheader("Spectrogram (Production)")
-	c1, c2, c3 = st.columns([1,1,1])
+	c1, c2 = st.columns([1,1])
 	with c1:
-		area2 = st.selectbox("Price Area (Spec)", options=price_areas, index=price_areas.index(default_area) if default_area in price_areas else 0)
-	with c2:
-		group2 = st.selectbox("Production Group (Spec)", options=production_groups, index=0)
-	with c3:
 		window_len = st.slider("Window length", min_value=128, max_value=2048, value=256, step=64)
 	max_overlap = int(max(0, window_len - 1))
 	default_overlap = int(min(128, max_overlap))
@@ -173,8 +169,12 @@ with tab_spec:
 		help="Overlap must be less than window length"
 	)
 
+	# Use area and group from sidebar (session_state)
+	area = st.session_state.get('selected_area', default_area)
+	group = st.session_state.get('selected_group', None)
+
 	try:
-		fig2 = spectrogram_plot(df, area=area2, group=group2, window_len=window_len, overlap=overlap)
+		fig2 = spectrogram_plot(df, area=area, group=group, window_len=window_len, overlap=overlap)
 		st.plotly_chart(fig2, use_container_width=True)
 	except Exception as e:
 		st.warning(str(e))
