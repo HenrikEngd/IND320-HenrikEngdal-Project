@@ -12,3 +12,4 @@ retry-requests
 folium
 streamlit-folium
 openmeteo-requests==1.7.4
+shapely
