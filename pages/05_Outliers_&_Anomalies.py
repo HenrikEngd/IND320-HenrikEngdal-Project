@@ -169,7 +169,7 @@ with tab_spc:
         temps = w1[temp_col].astype(float).values
         try:
             fig, is_outlier, summary = temp_spc_satv(times, temps, dct_cutoff=dct_cutoff, n_std=n_std)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             st.info(f"Outliers: {summary['n_outliers']} of {summary['n_total']} ({summary['percent_outliers']:.2f}%)")
         except Exception as e:
             st.warning(f"SPC calculation failed: {e}")
@@ -190,7 +190,7 @@ with tab_lof:
         times2 = w2['time']
         precip = w2[precip_col].astype(float).values
         fig2, is_anomaly, summary2 = precip_lof(times2, precip, contamination=contamination, n_neighbors=n_neighbors)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width='stretch')
         st.info(f"Anomalies: {summary2['n_outliers']} of {summary2['n_total']} ({summary2['percent_outliers']:.2f}%)")
         # Only show summary, not table
 

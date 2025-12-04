@@ -541,7 +541,7 @@ if not df.empty:
             legend_title_text="Season (July–June)"
         )
         st.write(f"### Monthly snow drift for all July–June periods in selected range (kg/m²)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     else:
         st.info("No monthly snow drift data available for the selected range.")
 
