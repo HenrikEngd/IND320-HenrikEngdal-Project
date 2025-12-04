@@ -21,12 +21,9 @@ if prod_df is not None and 'productiongroup' in prod_df.columns:
     prod_groups = sorted(prod_df['productiongroup'].dropna().unique())
 selected_area = price_area_sidebar(['NO1','NO2','NO3','NO4','NO5'], default=st.session_state.get('selected_area', 'NO5'))
 
-# Force rerun if the selected area changes
-if 'weather_area' in st.session_state and st.session_state['weather_area'] != selected_area:
-    st.session_state['selected_area'] = selected_area
-    st.experimental_rerun()
 
-
+if "weather_year" not in st.session_state:
+    st.session_state["weather_year"] = 2024  # or set a default value
 
 # Get selected area from session state (set by sidebar)
 sel_area = st.session_state.get('selected_area', 'NO5')
@@ -234,7 +231,7 @@ if df is not None:
             y_max_col = filtered_df[selected_column].max()
             fig.update_yaxes(range=[y_min_col, y_max_col], nticks=11)
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
     else:
         st.warning("No data available for the selected month(s).")

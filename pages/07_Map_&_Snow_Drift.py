@@ -163,11 +163,13 @@ else:
     st.info("Please choose a location on the map to plot data.")
 
 # Single pin (last clicked)
-folium.Marker(
-    location=st.session_state.selected_coordinates,
-    icon=folium.Icon(color="red"),
-    popup=f"{st.session_state.selected_coordinates[0]:.5f}, {st.session_state.selected_coordinates[1]:.5f}"
-).add_to(m)
+    selected_coordinates = st.session_state.get("selected_coordinates", None)
+    if selected_coordinates is not None:
+        folium.Marker(
+            location=selected_coordinates,
+            icon=folium.Icon(color="red"),
+            popup=f"{selected_coordinates[0]:.5f}, {selected_coordinates[1]:.5f}"
+        ).add_to(m)
 
 # Render map at full width
 out = st_folium(m, key="choropleth_map", height=600, width=1200)
@@ -178,8 +180,8 @@ if out and out.get("last_clicked"):
     lat = out["last_clicked"]["lat"]
     lon = out["last_clicked"]["lng"]
     new_coord = [lat, lon]
-    if new_coord != st.session_state.selected_coordinates:
-        st.session_state.selected_coordinates = new_coord
+    if st.session_state.get("selected_coordinates", None) != new_coord:
+        st.session_state["selected_coordinates"] = new_coord
         # No need for feature_id/id_to_name logic; selection is handled by shapely/GeoJSON logic above
         st.rerun()
         st.stop()
@@ -457,7 +459,7 @@ fig = px.bar(
     category_orders={"season_label": season_order}
 )
 fig.update_xaxes(title="Season (July–June)")
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width='stretch')
 
 
 st.subheader("Directional Wind Rose (16 sectors)")
@@ -468,7 +470,7 @@ rose_fig.add_trace(go.Barpolar(r=avg_tonnes, theta=angles, width=[360/16]*16,
                               name='Avg transport (tonnes/m)', marker_color='royalblue', opacity=0.8))
 rose_fig.update_layout(polar=dict(radialaxis=dict(title='tonnes/m')),
                        title='Average Directional Distribution of Snow Transport')
-st.plotly_chart(rose_fig, use_container_width=True)
+st.plotly_chart(rose_fig, width='stretch')
 
 
 st.header("Monthly Snow Drift")
